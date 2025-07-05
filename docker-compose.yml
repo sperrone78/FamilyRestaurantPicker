@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: family_picker
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: family_restaurant_picker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: postgres -c 'max_connections=200'
+
+volumes:
+  postgres_data:
