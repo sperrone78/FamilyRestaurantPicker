@@ -1,15 +1,17 @@
-import { FamilyMember } from '../types';
+import { FamilyMember, Cuisine, DietaryRestriction } from '../types';
 
 interface MemberSelectionCardProps {
   member: FamilyMember;
   isSelected: boolean;
-  onToggle: (memberId: number) => void;
+  onToggle: (memberId: string) => void;
+  cuisines?: Cuisine[];
+  dietaryRestrictions?: DietaryRestriction[];
 }
 
-export default function MemberSelectionCard({ member, isSelected, onToggle }: MemberSelectionCardProps) {
+export default function MemberSelectionCard({ member, isSelected, onToggle, cuisines = [], dietaryRestrictions = [] }: MemberSelectionCardProps) {
   const handleClick = (e: React.MouseEvent) => {
     // Don't trigger if the click came from the checkbox itself
-    if ((e.target as HTMLElement).type === 'checkbox') {
+    if ((e.target as HTMLInputElement).type === 'checkbox') {
       return;
     }
     onToggle(member.id);
@@ -45,14 +47,21 @@ export default function MemberSelectionCard({ member, isSelected, onToggle }: Me
         <div className="mt-3">
           <p className="text-sm font-medium text-gray-700 mb-2">Dietary Restrictions:</p>
           <div className="flex flex-wrap gap-1">
-            {member.dietaryRestrictions.map((restriction) => (
-              <span
-                key={restriction.id}
-                className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full"
-              >
-                {restriction.name}
-              </span>
-            ))}
+            {member.dietaryRestrictions.map((restriction, index) => {
+              // Handle both string IDs and full objects
+              const restrictionId = typeof restriction === 'string' ? restriction : restriction.id;
+              const restrictionObj = dietaryRestrictions.find(dr => dr.id === restrictionId);
+              const restrictionName = restrictionObj?.name || (typeof restriction === 'object' ? restriction.name : undefined) || 'Unknown Restriction';
+              
+              return (
+                <span
+                  key={restrictionId || `restriction-${index}`}
+                  className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full"
+                >
+                  {restrictionName}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
@@ -62,15 +71,30 @@ export default function MemberSelectionCard({ member, isSelected, onToggle }: Me
           <p className="text-sm font-medium text-gray-700 mb-2">Cuisine Preferences:</p>
           <div className="flex flex-wrap gap-1">
             {member.cuisinePreferences
-              .filter(pref => pref.preferenceLevel >= 4)
-              .map((pref) => (
-                <span
-                  key={pref.cuisineId}
-                  className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full"
-                >
-                  {pref.cuisineName} ({pref.preferenceLevel}/5)
-                </span>
-              ))}
+              .map((pref) => {
+                const cuisine = cuisines.find(c => c.id === String(pref.cuisineId));
+                const cuisineName = cuisine?.name || pref.cuisineName || 'Unknown Cuisine';
+                
+                // Use different styling based on preference level
+                const getPreferenceStyle = (level: number) => {
+                  if (level >= 4) {
+                    return 'bg-green-100 text-green-700'; // High preference (loved)
+                  } else if (level >= 3) {
+                    return 'bg-blue-100 text-blue-700';   // Medium preference (liked)
+                  } else {
+                    return 'bg-gray-100 text-gray-600';   // Low preference (neutral/disliked)
+                  }
+                };
+                
+                return (
+                  <span
+                    key={pref.cuisineId}
+                    className={`px-2 py-1 text-xs rounded-full ${getPreferenceStyle(pref.preferenceLevel)}`}
+                  >
+                    {cuisineName} ({pref.preferenceLevel}/5)
+                  </span>
+                );
+              })}
           </div>
         </div>
       )}

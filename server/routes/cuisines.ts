@@ -4,7 +4,7 @@ import { ApiResponse, Cuisine } from '../types';
 
 const router = express.Router();
 
-router.get('/', async (req, res: express.Response<ApiResponse<Cuisine[]>>, next) => {
+router.get('/', async (_req, res: express.Response<ApiResponse<Cuisine[]>>, next) => {
   try {
     const cuisines = await CuisineModel.findAll();
     res.json({

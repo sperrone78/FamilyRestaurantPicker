@@ -9,12 +9,15 @@ A web application to help families choose restaurants based on member preference
 - **Smart Recommendations**: Select attending family members and get restaurant suggestions based on their combined preferences
 - **Dietary Restrictions**: Full support for dietary needs including gluten-free options
 - **Cuisine Preference Scoring**: Restaurants are scored based on family member preferences (1-5 scale)
+- **User Favorites**: Mark restaurants as favorites for quick access and filtering
+- **Personal Comments**: Add, edit, and delete private comments on restaurants visible only to you
+- **Advanced Filtering**: Filter restaurants by favorites, cuisine type, dietary accommodations, and ratings
 
 ## Tech Stack
 
 - **Frontend**: React with TypeScript, Vite, Tailwind CSS
-- **Backend**: Node.js with Express, TypeScript
-- **Database**: PostgreSQL
+- **Backend**: Firebase (Authentication & Firestore)
+- **Database**: Firestore (NoSQL)
 - **Testing**: Jest, React Testing Library, Playwright
 - **Validation**: Joi
 - **API Client**: React Query
@@ -24,8 +27,8 @@ A web application to help families choose restaurants based on member preference
 Before you begin, ensure you have the following installed:
 
 - Node.js (v18 or higher)
-- PostgreSQL (v13 or higher)
 - npm or yarn
+- Firebase project with Authentication and Firestore enabled
 
 ## Getting Started
 
@@ -37,89 +40,95 @@ cd family-restaurant-picker
 npm install
 ```
 
-### 2. Database Setup
-
-#### Create PostgreSQL databases:
-```bash
-createdb family_restaurant_picker
-createdb family_restaurant_picker_test
-```
+### 2. Firebase Setup
 
 #### Set up environment variables:
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your database credentials:
+Edit `.env` with your Firebase project credentials:
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/family_restaurant_picker
-DATABASE_URL_TEST=postgresql://username:password@localhost:5432/family_restaurant_picker_test
-PORT=3000
-NODE_ENV=development
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
 ```
 
-#### Run migrations and seed data:
+#### Set up Firebase service account:
+1. Download your Firebase service account JSON file
+2. Save it as `firebase-service-account.json` in the project root
+
+#### Populate Firestore with initial data:
 ```bash
-npm run db:migrate
-npm run db:seed
+node scripts/migrate-to-firestore.js
 ```
 
-### 3. Start Development Servers
+### 3. Start Development Server
 
-#### Option 1: Start both servers simultaneously
 ```bash
-npm run dev
-```
-
-#### Option 2: Start servers separately
-```bash
-# Terminal 1 - Backend server (port 3000)
-npm run server:dev
-
-# Terminal 2 - Frontend dev server (port 3001)
 npm run client:dev
 ```
 
 ### 4. Access the Application
 
 - Frontend: http://localhost:3001
-- Backend API: http://localhost:3000
-- API Health Check: http://localhost:3000/health
+- Authentication: Firebase Auth
+- Database: Firestore
 
-## API Endpoints
+## Firestore Services
 
-### Family Members
-- `GET /api/family-members` - Get all family members
-- `POST /api/family-members` - Create new family member
-- `GET /api/family-members/:id` - Get family member by ID
-- `PUT /api/family-members/:id` - Update family member
-- `DELETE /api/family-members/:id` - Delete family member
+The application uses Firebase Firestore instead of traditional REST APIs. See `API-FIRESTORE.md` for detailed service documentation.
 
-### Restaurants
-- `GET /api/restaurants` - Get all restaurants (with optional filters)
-- `POST /api/restaurants` - Create new restaurant
-- `GET /api/restaurants/:id` - Get restaurant by ID
-- `PUT /api/restaurants/:id` - Update restaurant
-- `DELETE /api/restaurants/:id` - Delete restaurant
-
-### Recommendations
-- `POST /api/recommendations` - Get restaurant recommendations
-
-### Reference Data
-- `GET /api/dietary-restrictions` - Get all dietary restrictions
-- `GET /api/cuisines` - Get all cuisine types
+### Core Services
+- `familyMembersService` - Manage family members
+- `restaurantsService` - Manage restaurants with populated data
+- `favoritesService` - Manage user favorites (NEW)
+- `commentsService` - Manage user comments (NEW)
+- `referenceDataService` - Access cuisines and dietary restrictions
 
 ## Database Schema
 
-The application uses the following main tables:
+The application uses Firebase Firestore with the following collections:
 
-- `family_members` - Store family member information
-- `dietary_restrictions` - Available dietary restrictions
-- `member_dietary_restrictions` - Link members to their restrictions
-- `cuisines` - Available cuisine types
-- `member_cuisine_preferences` - Store member cuisine preferences (1-5 scale)
-- `restaurants` - Restaurant information
-- `restaurant_dietary_accommodations` - Link restaurants to dietary restrictions they accommodate
+- `familyMembers` - Store family member information
+- `restaurants` - Restaurant information with populated cuisine data
+- `cuisines` - Available cuisine types (reference data)
+- `dietaryRestrictions` - Available dietary restrictions (reference data)
+- `restaurantFavorites` - User-specific restaurant favorites (NEW)
+- `restaurantComments` - User-specific restaurant comments (NEW)
+
+See `DATABASE-FIRESTORE.md` for detailed schema documentation.
+
+## New Features
+
+### User Favorites
+- **Heart Icon**: Click the heart icon on any restaurant card to add/remove from favorites
+- **Favorites Filter**: Use the "Show only favorites" checkbox to view only your favorite restaurants
+- **Real-time Updates**: Favorite status updates immediately without page refresh
+- **Private Data**: Your favorites are only visible to you
+
+### Personal Comments
+- **Add Comments**: Click "View Details" on any restaurant card and scroll to the comments section
+- **Character Limit**: Comments are limited to 500 characters
+- **Edit/Delete**: You can edit or delete your own comments anytime
+- **Private Visibility**: Comments are only visible to you
+- **Timestamps**: See when comments were created and last modified
+
+### Enhanced Filtering
+- **Multiple Filters**: Combine favorites filter with cuisine, dietary, and rating filters
+- **Clear Filters**: Remove individual filters or clear all at once
+- **Active Filter Display**: See which filters are currently active with colored badges
+- **Specialty Cuisine Filters**: Filter by Dessert & Ice Cream, Bakery & Pastries, and Cafe & Coffee
+
+### UI/UX Improvements
+- **Complete Cuisine Preference Display**: All family member preferences are now visible (1-5 scale)
+- **Color-Coded Preferences**: Visual distinction for preference levels:
+  - 🟢 Green (4-5/5): Loved cuisines
+  - 🔵 Blue (3/5): Liked cuisines  
+  - ⚪ Gray (1-2/5): Neutral/disliked cuisines
 
 ## Testing
 
@@ -169,6 +178,19 @@ npm run db:reset:test    # Drop, create, migrate, and seed test database
 
 ## Key Features Implementation
 
+### Cuisine Categories
+The system includes comprehensive cuisine categorization:
+
+**Traditional Cuisines:**
+- American, Italian, Mexican, Chinese, Japanese, Indian, Thai
+- Mediterranean, French, Greek, Vietnamese, Korean
+- BBQ, Seafood, Steakhouse
+
+**Specialty Food Categories (NEW):**
+- **Dessert & Ice Cream** - Ice cream shops, dessert parlors, specialty sweet treats
+- **Bakery & Pastries** - Bakeries, pastry shops, fresh baked goods  
+- **Cafe & Coffee** - Coffee shops, cafes, light breakfast/lunch spots
+
 ### Dietary Restrictions Support
 The system supports the following dietary restrictions out of the box:
 - Gluten Free (prominently featured as requested)
@@ -187,11 +209,17 @@ The recommendation engine works by:
 
 1. **Filtering**: Only shows restaurants that accommodate ALL dietary restrictions of selected family members
 2. **Scoring**: Restaurants are scored (0-100) based on:
-   - Dietary accommodation (40 points for accommodating all restrictions)
-   - Cuisine preferences (up to 30 points based on family preferences)
-   - Restaurant rating (up to 15 points for excellent ratings)
-   - Price consideration (5 points for budget-friendly options)
+   - Base availability (10 points for existing restaurant)
+   - Cuisine preferences (up to 30 points based on family preferences, 1-5 scale)
+   - Dietary accommodation (up to 30 points for accommodating all restrictions)
+   - Restaurant rating (up to 20 points based on star rating)
+   - Price consideration (up to 10 points for budget-friendly options)
 3. **Ranking**: Results are sorted by score, highest first
+4. **Favorite Boost**: Favorited restaurants receive a 10% score boost (capped at 100%)
+
+**Recent Fixes:**
+- Fixed dietary restriction matching bug that prevented proper scoring
+- Improved cuisine preference data handling for accurate recommendations
 
 ### Input Validation
 All API endpoints include comprehensive validation:

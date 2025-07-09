@@ -1,16 +1,52 @@
-import { RestaurantRecommendation } from '../types';
+import { useState } from 'react';
+import { RestaurantRecommendation, RestaurantComment } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { favoritesService } from '../services/firestore';
 
 interface RecommendationCardProps {
   recommendation: RestaurantRecommendation;
   totalMembers: number;
+  isFavorite?: boolean;
+  userComments?: RestaurantComment[];
+  onFavoriteToggle?: (restaurantId: string, isFavorite: boolean) => void;
 }
 
-export default function RecommendationCard({ recommendation, totalMembers }: RecommendationCardProps) {
-  const { restaurant, score, reasons, accommodatedMembers, missedRestrictions } = recommendation;
+export default function RecommendationCard({ 
+  recommendation, 
+  totalMembers, 
+  isFavorite = false, 
+  userComments = [], 
+  onFavoriteToggle 
+}: RecommendationCardProps) {
+  const { restaurant, percentage, reasons, accommodatedMembers, missedRestrictions } = recommendation;
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const { user } = useAuth();
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'bg-green-100 text-green-800 border-green-200';
-    if (score >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+  const handleFavoriteToggle = async () => {
+    if (!user) return;
+    
+    setIsTogglingFavorite(true);
+    try {
+      const newFavoriteState = !isFavorite;
+      
+      if (newFavoriteState) {
+        await favoritesService.addFavorite(user.uid, restaurant.id);
+      } else {
+        await favoritesService.removeFavorite(user.uid, restaurant.id);
+      }
+      
+      onFavoriteToggle?.(restaurant.id, newFavoriteState);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsTogglingFavorite(false);
+    }
+  };
+
+  const getScoreColor = (percentage: number) => {
+    if (percentage >= 80) return 'bg-green-100 text-green-800 border-green-200';
+    if (percentage >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
@@ -47,10 +83,66 @@ export default function RecommendationCard({ recommendation, totalMembers }: Rec
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+    <div className={`bg-white rounded-lg shadow-md p-6 relative ${
+      isFavorite ? 'border-2 border-red-200' : 'border border-gray-200'
+    }`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h3 className="text-xl font-semibold text-gray-900 mb-1">{restaurant.name}</h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-xl font-semibold text-gray-900">{restaurant.name}</h3>
+            <div className="flex items-center space-x-2">
+              {/* Favorite Button */}
+              <button
+                onClick={handleFavoriteToggle}
+                disabled={isTogglingFavorite}
+                className={`p-2 rounded-full transition-colors ${
+                  isFavorite
+                    ? 'text-red-500 hover:text-red-600'
+                    : 'text-gray-400 hover:text-red-500'
+                } ${isTogglingFavorite ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <svg className="w-5 h-5" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+              
+              {/* Comments Indicator */}
+              {userComments.length > 0 && (
+                <div 
+                  className="relative"
+                  onMouseEnter={() => setShowComments(true)}
+                  onMouseLeave={() => setShowComments(false)}
+                >
+                  <button className="p-2 rounded-full text-blue-500 hover:text-blue-600">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.965 8.965 0 01-4.126-1.004L3 21l1.996-5.874A8.965 8.965 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+                    </svg>
+                  </button>
+                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {userComments.length}
+                  </span>
+                  
+                  {/* Comments Tooltip */}
+                  {showComments && (
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">Your Comments</h4>
+                      <div className="max-h-40 overflow-y-auto space-y-2">
+                        {userComments.map((comment) => (
+                          <div key={comment.id} className="text-sm">
+                            <p className="text-gray-700">{comment.content}</p>
+                            <p className="text-gray-500 text-xs mt-1">
+                              {new Date(comment.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="flex items-center space-x-4 text-sm text-gray-600">
             {restaurant.cuisine && (
               <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
@@ -71,8 +163,8 @@ export default function RecommendationCard({ recommendation, totalMembers }: Rec
           </div>
         </div>
         
-        <div className={`px-3 py-1 rounded-full border text-sm font-medium ${getScoreColor(score)}`}>
-          {score}/100
+        <div className={`px-3 py-1 rounded-full border text-sm font-medium ${getScoreColor(percentage)}`}>
+          {percentage}%
         </div>
       </div>
 
@@ -107,13 +199,13 @@ export default function RecommendationCard({ recommendation, totalMembers }: Rec
             </span>
           </div>
           
-          {missedRestrictions.length > 0 && (
+          {missedRestrictions.length > 0 && missedRestrictions.some(r => r.name && r.name.trim()) && (
             <div className="flex items-center space-x-1">
               <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
               <span className="text-sm text-red-600">
-                Missing: {missedRestrictions.map(r => r.name).join(', ')}
+                Missing: {missedRestrictions.filter(r => r.name && r.name.trim()).map(r => r.name).join(', ')}
               </span>
             </div>
           )}

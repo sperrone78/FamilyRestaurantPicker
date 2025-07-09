@@ -1,13 +1,15 @@
-import { FamilyMember } from '../types';
+import { FamilyMember, Cuisine } from '../types';
 
 interface FamilyMemberCardProps {
   member: FamilyMember;
   onEdit: (member: FamilyMember) => void;
-  onDelete: (memberId: number) => void;
+  onDelete: (memberId: string) => void;
   isDeleting?: boolean;
+  cuisines?: Cuisine[];
+  dietaryRestrictions?: { id: string; name: string; }[];
 }
 
-export default function FamilyMemberCard({ member, onEdit, onDelete, isDeleting }: FamilyMemberCardProps) {
+export default function FamilyMemberCard({ member, onEdit, onDelete, isDeleting, cuisines = [], dietaryRestrictions = [] }: FamilyMemberCardProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -69,15 +71,22 @@ export default function FamilyMemberCard({ member, onEdit, onDelete, isDeleting 
         <h4 className="text-sm font-medium text-gray-700 mb-2">Dietary Restrictions</h4>
         {member.dietaryRestrictions && member.dietaryRestrictions.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {member.dietaryRestrictions.map((restriction) => (
-              <span
-                key={restriction.id}
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
-                data-testid={`restriction-${restriction.name.replace(/\s+/g, '-').toLowerCase()}`}
-              >
-                {restriction.name}
-              </span>
-            ))}
+            {member.dietaryRestrictions.map((restriction, index) => {
+              // Handle both string IDs and full objects
+              const restrictionId = typeof restriction === 'string' ? restriction : restriction.id;
+              const restrictionObj = dietaryRestrictions.find(dr => dr.id === restrictionId);
+              const restrictionName = restrictionObj?.name || (typeof restriction === 'object' ? restriction.name : undefined) || 'Unknown Restriction';
+              
+              return (
+                <span
+                  key={restrictionId || `restriction-${index}`}
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
+                  data-testid={`restriction-${restrictionName.replace(/\s+/g, '-').toLowerCase()}`}
+                >
+                  {restrictionName}
+                </span>
+              );
+            })}
           </div>
         ) : (
           <p className="text-gray-500 text-sm">No dietary restrictions</p>
@@ -89,14 +98,19 @@ export default function FamilyMemberCard({ member, onEdit, onDelete, isDeleting 
         <h4 className="text-sm font-medium text-gray-700 mb-2">Cuisine Preferences</h4>
         {member.cuisinePreferences && member.cuisinePreferences.length > 0 ? (
           <div className="space-y-2">
-            {member.cuisinePreferences.map((preference) => (
-              <div key={preference.cuisineId} className="flex justify-between items-center">
-                <span className="text-sm text-gray-700">{preference.cuisineName}</span>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPreferenceColor(preference.preferenceLevel)}`}>
-                  {preference.preferenceLevel}/5 - {getPreferenceLabel(preference.preferenceLevel)}
-                </span>
-              </div>
-            ))}
+            {member.cuisinePreferences.map((preference) => {
+              const cuisine = cuisines.find(c => c.id === String(preference.cuisineId));
+              const cuisineName = cuisine?.name || preference.cuisineName || 'Unknown Cuisine';
+              
+              return (
+                <div key={preference.cuisineId} className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700">{cuisineName}</span>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPreferenceColor(preference.preferenceLevel)}`}>
+                    {preference.preferenceLevel}/5 - {getPreferenceLabel(preference.preferenceLevel)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <p className="text-gray-500 text-sm">No cuisine preferences set</p>

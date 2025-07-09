@@ -3,8 +3,7 @@ import { db } from '../database/connection';
 import { 
   Restaurant, 
   CreateRestaurantRequest, 
-  UpdateRestaurantRequest,
-  DietaryAccommodation
+  UpdateRestaurantRequest
 } from '../types';
 
 export class RestaurantModel {

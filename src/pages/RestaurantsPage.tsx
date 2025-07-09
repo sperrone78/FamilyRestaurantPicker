@@ -1,38 +1,67 @@
 import { useState } from 'react';
-import { useQuery } from 'react-query';
-import { restaurantsApi, referenceDataApi } from '../services/api';
-import type { Restaurant } from '../types';
+import { useQuery, useQueryClient } from 'react-query';
+import { referenceDataService, favoritesService } from '../services/firestore';
 import RestaurantCard from '../components/RestaurantCard';
+import { useAuth } from '../contexts/AuthContext';
+import { useRestaurantsWithUserData } from '../hooks/useRestaurantsWithUserData';
 
 export default function RestaurantsPage() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<{
-    cuisine?: number;
-    dietary?: number;
+    cuisine?: string;
+    dietary?: string;
     rating?: number;
     search?: string;
+    showFavoritesOnly?: boolean;
   }>({});
 
-  const { data: restaurants = [], isLoading: restaurantsLoading, error: restaurantsError } = useQuery(
-    ['restaurants', filters.cuisine, filters.dietary, filters.rating],
-    () => restaurantsApi.getAll({
-      cuisine: filters.cuisine,
-      dietary: filters.dietary,
-      rating: filters.rating,
-    })
-  );
+  const { 
+    restaurantsWithUserData, 
+    loading: restaurantsLoading, 
+    error: restaurantsError,
+    updateFavoriteStatus,
+    clearOptimisticUpdate
+  } = useRestaurantsWithUserData();
 
-  const { data: cuisines = [] } = useQuery('cuisines', referenceDataApi.getCuisines);
-  const { data: dietaryRestrictions = [] } = useQuery('dietaryRestrictions', referenceDataApi.getDietaryRestrictions);
+  const { data: cuisines = [] } = useQuery('cuisines', referenceDataService.getCuisines);
+  const { data: dietaryRestrictions = [] } = useQuery('dietaryRestrictions', referenceDataService.getDietaryRestrictions);
 
-  const filteredRestaurants = restaurants.filter(restaurant => {
-    if (!filters.search) return true;
-    const searchTerm = filters.search.toLowerCase();
-    return (
-      restaurant.name.toLowerCase().includes(searchTerm) ||
-      restaurant.address?.toLowerCase().includes(searchTerm) ||
-      restaurant.cuisine?.name.toLowerCase().includes(searchTerm) ||
-      restaurant.notes?.toLowerCase().includes(searchTerm)
-    );
+  const filteredRestaurants = restaurantsWithUserData.filter(restaurant => {
+    // Favorites filter
+    if (filters.showFavoritesOnly && !restaurant.isFavorite) {
+      return false;
+    }
+    // Search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      const matchesSearch = (
+        restaurant.name.toLowerCase().includes(searchTerm) ||
+        restaurant.address?.toLowerCase().includes(searchTerm) ||
+        restaurant.notes?.toLowerCase().includes(searchTerm)
+      );
+      if (!matchesSearch) return false;
+    }
+    
+    // Cuisine filter
+    if (filters.cuisine) {
+      if (restaurant.cuisine?.id !== filters.cuisine) return false;
+    }
+    
+    // Dietary restriction filter
+    if (filters.dietary) {
+      const hasAccommodation = restaurant.dietaryAccommodations?.some(
+        acc => acc.id === filters.dietary
+      );
+      if (!hasAccommodation) return false;
+    }
+    
+    // Rating filter
+    if (filters.rating) {
+      if (!restaurant.rating || restaurant.rating < filters.rating) return false;
+    }
+    
+    return true;
   });
 
   const handleFilterChange = (key: string, value: any) => {
@@ -44,6 +73,32 @@ export default function RestaurantsPage() {
 
   const clearFilters = () => {
     setFilters({});
+  };
+
+  const handleFavoriteToggle = async (restaurantId: string, isFavorite: boolean) => {
+    if (!user) return;
+    
+    // Optimistically update the UI
+    updateFavoriteStatus(restaurantId, isFavorite);
+    
+    try {
+      // Update the database
+      if (isFavorite) {
+        await favoritesService.addFavorite(user.uid, restaurantId);
+      } else {
+        await favoritesService.removeFavorite(user.uid, restaurantId);
+      }
+      
+      // Invalidate the favorites query to ensure fresh data
+      queryClient.invalidateQueries(['favorites', user.uid]);
+      
+      // Clear the optimistic update once the real data is refreshed
+      setTimeout(() => clearOptimisticUpdate(restaurantId), 100);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      // Revert the optimistic update on error
+      updateFavoriteStatus(restaurantId, !isFavorite);
+    }
   };
 
   if (restaurantsError) {
@@ -68,6 +123,24 @@ export default function RestaurantsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        {/* Favorites Toggle */}
+        <div className="mb-4">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filters.showFavoritesOnly || false}
+              onChange={(e) => handleFilterChange('showFavoritesOnly', e.target.checked)}
+              className="mr-2 h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+            />
+            <span className="text-sm font-medium text-gray-700 flex items-center">
+              <svg className="w-4 h-4 mr-1 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              Show only favorites
+            </span>
+          </label>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {/* Search */}
           <div>
@@ -92,7 +165,7 @@ export default function RestaurantsPage() {
             <select
               id="cuisine"
               value={filters.cuisine || ''}
-              onChange={(e) => handleFilterChange('cuisine', e.target.value ? parseInt(e.target.value) : '')}
+              onChange={(e) => handleFilterChange('cuisine', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="">All Cuisines</option>
@@ -112,7 +185,7 @@ export default function RestaurantsPage() {
             <select
               id="dietary"
               value={filters.dietary || ''}
-              onChange={(e) => handleFilterChange('dietary', e.target.value ? parseInt(e.target.value) : '')}
+              onChange={(e) => handleFilterChange('dietary', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="">All Options</option>
@@ -145,7 +218,7 @@ export default function RestaurantsPage() {
         </div>
 
         {/* Active Filters & Clear */}
-        {(filters.search || filters.cuisine || filters.dietary || filters.rating) && (
+        {(filters.search || filters.cuisine || filters.dietary || filters.rating || filters.showFavoritesOnly) && (
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div className="flex flex-wrap gap-2">
               {filters.search && (
@@ -161,7 +234,7 @@ export default function RestaurantsPage() {
               )}
               {filters.cuisine && (
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary-100 text-primary-800">
-                  {cuisines.find(c => c.id === filters.cuisine)?.name}
+                  {cuisines.find(c => c.id === filters.cuisine?.toString())?.name}
                   <button
                     onClick={() => handleFilterChange('cuisine', '')}
                     className="ml-1 text-primary-600 hover:text-primary-800"
@@ -172,7 +245,7 @@ export default function RestaurantsPage() {
               )}
               {filters.dietary && (
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary-100 text-primary-800">
-                  {dietaryRestrictions.find(d => d.id === filters.dietary)?.name}
+                  {dietaryRestrictions.find(d => d.id === filters.dietary?.toString())?.name}
                   <button
                     onClick={() => handleFilterChange('dietary', '')}
                     className="ml-1 text-primary-600 hover:text-primary-800"
@@ -187,6 +260,20 @@ export default function RestaurantsPage() {
                   <button
                     onClick={() => handleFilterChange('rating', '')}
                     className="ml-1 text-primary-600 hover:text-primary-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {filters.showFavoritesOnly && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  Favorites Only
+                  <button
+                    onClick={() => handleFilterChange('showFavoritesOnly', false)}
+                    className="ml-1 text-red-600 hover:text-red-800"
                   >
                     ×
                   </button>
@@ -246,7 +333,11 @@ export default function RestaurantsPage() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredRestaurants.map((restaurant) => (
-            <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+            <RestaurantCard 
+              key={restaurant.id} 
+              restaurant={restaurant}
+              onFavoriteToggle={handleFavoriteToggle}
+            />
           ))}
         </div>
       )}

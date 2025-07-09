@@ -7,7 +7,7 @@ import { ApiResponse, FamilyMember } from '../types';
 
 const router = express.Router();
 
-router.get('/', async (req, res: express.Response<ApiResponse<FamilyMember[]>>, next) => {
+router.get('/', async (_req, res: express.Response<ApiResponse<FamilyMember[]>>, next) => {
   try {
     const members = await FamilyMemberModel.findAll();
     res.json({

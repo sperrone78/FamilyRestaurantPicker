@@ -1,13 +1,19 @@
 import { useState } from 'react';
-import { Restaurant } from '../types';
+import { RestaurantWithUserData } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 import RestaurantDetailsModal from './RestaurantDetailsModal';
 
 interface RestaurantCardProps {
-  restaurant: Restaurant;
+  restaurant: RestaurantWithUserData;
+  onFavoriteToggle?: (restaurantId: string, isFavorite: boolean) => Promise<void>;
 }
 
-export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
+export default function RestaurantCard({ restaurant, onFavoriteToggle }: RestaurantCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const { user, currentFamily } = useAuth();
+  
+  const isFavorite = restaurant.isFavorite || false;
   const formatPriceRange = (priceRange?: number) => {
     if (!priceRange) return 'N/A';
     return '$'.repeat(priceRange);
@@ -18,21 +24,51 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
     return '★'.repeat(Math.floor(rating)) + (rating % 1 >= 0.5 ? '☆' : '');
   };
 
+  const handleFavoriteToggle = async () => {
+    if (!user || !currentFamily || !onFavoriteToggle) return;
+    
+    setIsTogglingFavorite(true);
+    try {
+      const newFavoriteState = !isFavorite;
+      await onFavoriteToggle(restaurant.id, newFavoriteState);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsTogglingFavorite(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200">
       <div className="p-6">
         <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-1">
-              {restaurant.name}
-            </h3>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xl font-semibold text-gray-900">
+                {restaurant.name}
+              </h3>
+              <button
+                onClick={handleFavoriteToggle}
+                disabled={isTogglingFavorite}
+                className={`p-2 rounded-full transition-colors ${
+                  isFavorite
+                    ? 'text-red-500 hover:text-red-600'
+                    : 'text-gray-400 hover:text-red-500'
+                } ${isTogglingFavorite ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <svg className="w-5 h-5" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+            </div>
             {restaurant.cuisine && (
               <span className="inline-block bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full">
                 {restaurant.cuisine.name}
               </span>
             )}
           </div>
-          <div className="text-right">
+          <div className="text-right ml-4">
             {restaurant.rating && (
               <div className="text-yellow-500 text-lg mb-1" title={`${restaurant.rating}/5 stars`}>
                 {formatRating(restaurant.rating)}
@@ -75,9 +111,9 @@ export default function RestaurantCard({ restaurant }: RestaurantCardProps) {
           <div className="mb-4">
             <h4 className="text-sm font-medium text-gray-900 mb-2">Dietary Accommodations:</h4>
             <div className="flex flex-wrap gap-1">
-              {restaurant.dietaryAccommodations.map((accommodation) => (
+              {restaurant.dietaryAccommodations.map((accommodation, index) => (
                 <span
-                  key={accommodation.id}
+                  key={accommodation.id || `accommodation-${index}`}
                   className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full"
                   title={accommodation.notes || undefined}
                 >

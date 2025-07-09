@@ -1,7 +1,8 @@
-import { Restaurant } from '../types';
+import { RestaurantWithUserData } from '../types';
+import RestaurantComments from './RestaurantComments';
 
 interface RestaurantDetailsModalProps {
-  restaurant: Restaurant;
+  restaurant: RestaurantWithUserData;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -170,8 +171,8 @@ export default function RestaurantDetailsModal({ restaurant, isOpen, onClose }: 
             <div>
               <h4 className="font-medium text-gray-900 mb-3">Dietary Accommodations</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {restaurant.dietaryAccommodations.map((accommodation) => (
-                  <div key={accommodation.id} className="bg-green-50 border border-green-200 rounded-lg p-3">
+                {restaurant.dietaryAccommodations.map((accommodation, index) => (
+                  <div key={accommodation.id || `accommodation-${index}`} className="bg-green-50 border border-green-200 rounded-lg p-3">
                     <div className="flex items-start space-x-2">
                       <svg className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -188,6 +189,11 @@ export default function RestaurantDetailsModal({ restaurant, isOpen, onClose }: 
               </div>
             </div>
           )}
+
+          {/* Comments Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <RestaurantComments restaurantId={restaurant.id} />
+          </div>
         </div>
 
         {/* Footer */}

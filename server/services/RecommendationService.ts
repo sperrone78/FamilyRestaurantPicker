@@ -80,7 +80,7 @@ export class RecommendationService {
     `;
 
     const result = await db.query(query, memberIds);
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       id: row.id,
       name: row.name,
       email: row.email,
@@ -162,7 +162,7 @@ export class RecommendationService {
     `;
 
     const result = await db.query(query, params);
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       id: row.id,
       name: row.name,
       address: row.address,
@@ -302,7 +302,7 @@ export class RecommendationService {
     return { score, reason };
   }
 
-  private static generateSummary(members: FamilyMember[], allDietaryRestrictions: DietaryRestriction[]): RecommendationSummary {
+  private static generateSummary(members: FamilyMember[], _allDietaryRestrictions: DietaryRestriction[]): RecommendationSummary {
     const restrictionCounts = new Map<number, { restriction: DietaryRestriction; count: number }>();
     
     members.forEach(member => {

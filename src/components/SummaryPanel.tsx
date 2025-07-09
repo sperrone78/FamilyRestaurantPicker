@@ -1,12 +1,14 @@
-import { FamilyMember, RecommendationSummary } from '../types';
+import { FamilyMember, RecommendationSummary, Cuisine, DietaryRestriction } from '../types';
 
 interface SummaryPanelProps {
   selectedMembers: FamilyMember[];
   summary?: RecommendationSummary;
   resultsCount?: number;
+  cuisines?: Cuisine[];
+  dietaryRestrictions?: DietaryRestriction[];
 }
 
-export default function SummaryPanel({ selectedMembers, summary, resultsCount }: SummaryPanelProps) {
+export default function SummaryPanel({ selectedMembers, summary: _summary, resultsCount, cuisines = [], dietaryRestrictions = [] }: SummaryPanelProps) {
   if (selectedMembers.length === 0) {
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -22,6 +24,15 @@ export default function SummaryPanel({ selectedMembers, summary, resultsCount }:
 
   const allDietaryRestrictions = selectedMembers
     .flatMap(member => member.dietaryRestrictions || [])
+    .map(restriction => {
+      // Handle both string IDs and full objects
+      const restrictionId = typeof restriction === 'string' ? restriction : restriction.id;
+      const restrictionObj = dietaryRestrictions.find(dr => dr.id === restrictionId);
+      return {
+        id: restrictionId,
+        name: restrictionObj?.name || (typeof restriction === 'object' ? restriction.name : undefined) || 'Unknown Restriction'
+      };
+    })
     .filter((restriction, index, self) => 
       self.findIndex(r => r.id === restriction.id) === index
     );
@@ -64,9 +75,9 @@ export default function SummaryPanel({ selectedMembers, summary, resultsCount }:
           </h4>
           {allDietaryRestrictions.length > 0 ? (
             <div className="flex flex-wrap gap-1">
-              {allDietaryRestrictions.map((restriction) => (
+              {allDietaryRestrictions.map((restriction, index) => (
                 <span
-                  key={restriction.id}
+                  key={restriction.id || `restriction-${index}`}
                   className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full"
                 >
                   {restriction.name}
@@ -82,15 +93,20 @@ export default function SummaryPanel({ selectedMembers, summary, resultsCount }:
       {/* Always show restriction summary when members are selected */}
       {selectedMembers.length > 0 && (() => {
         // Calculate restriction counts locally for accuracy
-        const restrictionCounts = new Map<number, { name: string; count: number }>();
+        const restrictionCounts = new Map<string, { name: string; count: number }>();
         selectedMembers.forEach(member => {
           member.dietaryRestrictions?.forEach(restriction => {
-            const existing = restrictionCounts.get(restriction.id);
+            // Handle both string IDs and full objects
+            const restrictionId = typeof restriction === 'string' ? restriction : restriction.id;
+            const restrictionObj = dietaryRestrictions.find(dr => dr.id === restrictionId);
+            const restrictionName = restrictionObj?.name || (typeof restriction === 'object' ? restriction.name : undefined) || 'Unknown Restriction';
+            
+            const existing = restrictionCounts.get(String(restrictionId));
             if (existing) {
               existing.count++;
             } else {
-              restrictionCounts.set(restriction.id, {
-                name: restriction.name,
+              restrictionCounts.set(String(restrictionId), {
+                name: restrictionName,
                 count: 1
               });
             }
@@ -110,8 +126,8 @@ export default function SummaryPanel({ selectedMembers, summary, resultsCount }:
                 </h4>
                 {restrictionArray.length > 0 ? (
                   <div className="space-y-2">
-                    {restrictionArray.map((restriction) => (
-                      <div key={restriction.name} className="flex items-center justify-between">
+                    {restrictionArray.map((restriction, index) => (
+                      <div key={`restriction-summary-${restriction.name}-${index}`} className="flex items-center justify-between">
                         <span className="text-sm text-gray-900">{restriction.name}</span>
                         <span className="text-xs text-gray-500">
                           {restriction.count} member{restriction.count !== 1 ? 's' : ''}
@@ -131,17 +147,22 @@ export default function SummaryPanel({ selectedMembers, summary, resultsCount }:
                 </h4>
                 {(() => {
                   // Calculate cuisine preferences locally
-                  const cuisinePreferenceMap = new Map<number, { name: string; total: number; count: number }>();
+                  const cuisinePreferenceMap = new Map<string, { name: string; total: number; count: number }>();
                   
                   selectedMembers.forEach(member => {
                     member.cuisinePreferences?.forEach(pref => {
-                      const existing = cuisinePreferenceMap.get(pref.cuisineId);
+                      // Convert both IDs to strings for comparison
+                      const cuisine = cuisines.find(c => c.id === String(pref.cuisineId));
+                      const cuisineName = cuisine?.name || pref.cuisineName || 'Unknown Cuisine';
+                      
+                      const cuisineKey = String(pref.cuisineId);
+                      const existing = cuisinePreferenceMap.get(cuisineKey);
                       if (existing) {
                         existing.total += pref.preferenceLevel;
                         existing.count++;
                       } else {
-                        cuisinePreferenceMap.set(pref.cuisineId, {
-                          name: pref.cuisineName,
+                        cuisinePreferenceMap.set(cuisineKey, {
+                          name: cuisineName,
                           total: pref.preferenceLevel,
                           count: 1
                         });
@@ -149,8 +170,9 @@ export default function SummaryPanel({ selectedMembers, summary, resultsCount }:
                     });
                   });
 
-                  const cuisineArray = Array.from(cuisinePreferenceMap.values())
-                    .map(cuisine => ({
+                  const cuisineArray = Array.from(cuisinePreferenceMap.entries())
+                    .map(([cuisineId, cuisine]) => ({
+                      id: cuisineId,
                       name: cuisine.name,
                       average: cuisine.total / cuisine.count
                     }))
@@ -160,13 +182,13 @@ export default function SummaryPanel({ selectedMembers, summary, resultsCount }:
                   return cuisineArray.length > 0 ? (
                     <div className="space-y-2">
                       {cuisineArray.map((cuisine) => (
-                        <div key={cuisine.name} className="flex items-center justify-between">
+                        <div key={cuisine.id} className="flex items-center justify-between">
                           <span className="text-sm text-gray-900">{cuisine.name}</span>
                           <div className="flex items-center space-x-1">
                             <div className="flex">
                               {[...Array(5)].map((_, i) => (
                                 <svg
-                                  key={i}
+                                  key={`${cuisine.id}-star-${i}`}
                                   className={`w-3 h-3 ${
                                     i < cuisine.average
                                       ? 'text-yellow-400'

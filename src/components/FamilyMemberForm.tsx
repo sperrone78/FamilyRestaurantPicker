@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from 'react-query';
 import { referenceDataApi } from '../services/api';
-import { FamilyMember, CreateFamilyMemberRequest, DietaryRestriction, Cuisine } from '../types';
+import { FamilyMember, CreateFamilyMemberRequest } from '../types';
 
 interface FamilyMemberFormProps {
   member?: FamilyMember;
@@ -46,17 +46,22 @@ export default function FamilyMemberForm({ member, onSubmit, onCancel, isLoading
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const submitData = {
+    const submitData: CreateFamilyMemberRequest = {
       name: formData.name,
-      email: formData.email || undefined,
       // Always send arrays (even if empty) so backend knows to clear them
       dietaryRestrictions: formData.dietaryRestrictions,
       cuisinePreferences: formData.cuisinePreferences
     };
+    
+    // Only include email if it has a value (Firestore doesn't allow undefined)
+    if (formData.email && formData.email.trim()) {
+      submitData.email = formData.email.trim();
+    }
+    
     onSubmit(submitData);
   };
 
-  const handleDietaryRestrictionChange = (restrictionId: number, checked: boolean) => {
+  const handleDietaryRestrictionChange = (restrictionId: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
       dietaryRestrictions: checked
@@ -65,7 +70,7 @@ export default function FamilyMemberForm({ member, onSubmit, onCancel, isLoading
     }));
   };
 
-  const handleCuisinePreferenceChange = (cuisineId: number, level: number) => {
+  const handleCuisinePreferenceChange = (cuisineId: string, level: number) => {
     setFormData(prev => ({
       ...prev,
       cuisinePreferences: prev.cuisinePreferences.some(cp => cp.cuisineId === cuisineId)
@@ -76,7 +81,7 @@ export default function FamilyMemberForm({ member, onSubmit, onCancel, isLoading
     }));
   };
 
-  const removeCuisinePreference = (cuisineId: number) => {
+  const removeCuisinePreference = (cuisineId: string) => {
     setFormData(prev => ({
       ...prev,
       cuisinePreferences: prev.cuisinePreferences.filter(cp => cp.cuisineId !== cuisineId)
@@ -182,7 +187,7 @@ export default function FamilyMemberForm({ member, onSubmit, onCancel, isLoading
           <div className="mt-4">
             <select
               onChange={(e) => {
-                const cuisineId = parseInt(e.target.value);
+                const cuisineId = e.target.value;
                 if (cuisineId && !formData.cuisinePreferences.some(cp => cp.cuisineId === cuisineId)) {
                   handleCuisinePreferenceChange(cuisineId, 3);
                 }

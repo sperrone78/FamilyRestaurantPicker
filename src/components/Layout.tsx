@@ -1,8 +1,35 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ReactNode } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: ReactNode;
+}
+
+function UserMenu() {
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Failed to log out', error);
+    }
+  };
+
+  return (
+    <div className="flex items-center space-x-4">
+      <span className="text-sm text-gray-700">
+        {user?.email}
+      </span>
+      <button
+        onClick={handleLogout}
+        className="text-sm text-gray-500 hover:text-gray-700"
+      >
+        Sign out
+      </button>
+    </div>
+  );
 }
 
 export default function Layout({ children }: LayoutProps) {
@@ -41,6 +68,9 @@ export default function Layout({ children }: LayoutProps) {
                   </Link>
                 ))}
               </div>
+            </div>
+            <div className="flex items-center">
+              <UserMenu />
             </div>
           </div>
         </div>

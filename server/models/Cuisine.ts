@@ -10,7 +10,7 @@ export class CuisineModel {
     `;
 
     const result = await db.query(query);
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       id: row.id,
       name: row.name,
       description: row.description,

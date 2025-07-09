@@ -9,16 +9,16 @@ interface AppError extends Error {
 
 export const errorHandler = (
   err: AppError,
-  req: Request,
+  _req: Request,
   res: Response<ApiResponse<never>>,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   console.error('Error:', err);
 
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
   let code = err.code || 'INTERNAL_SERVER_ERROR';
-  let details = err.details;
+  const details = err.details;
 
   if (err.name === 'ValidationError') {
     statusCode = 400;

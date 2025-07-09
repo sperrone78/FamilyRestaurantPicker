@@ -1,19 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
-import { familyMembersApi, referenceDataApi, recommendationsApi } from '../services/api';
-import { FamilyMember, Cuisine, RecommendationRequest, RecommendationResponse } from '../types';
+import { familyMembersService, referenceDataService, restaurantsService, favoritesService, commentsService } from '../services/firestore';
+import { RecommendationService } from '../services/recommendationService';
+import { FamilyMember, Cuisine, RecommendationResponse, Restaurant, RestaurantFavorite, RestaurantComment } from '../types';
 import MemberSelectionCard from '../components/MemberSelectionCard';
 import FilterPanel from '../components/FilterPanel';
 import RecommendationCard from '../components/RecommendationCard';
 import SummaryPanel from '../components/SummaryPanel';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function RecommendationsPage() {
+  const { user, currentFamily } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [cuisines, setCuisines] = useState<Cuisine[]>([]);
-  const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<RestaurantFavorite[]>([]);
+  const [comments, setComments] = useState<RestaurantComment[]>([]);
   const [filters, setFilters] = useState<{
     maxPriceRange?: number;
     minRating?: number;
-    cuisineIds?: number[];
+    cuisineIds?: string[];
   }>({});
   const [recommendations, setRecommendations] = useState<RecommendationResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,15 +27,27 @@ export default function RecommendationsPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const recommendationsRef = useRef<HTMLDivElement>(null);
 
+  const [dietaryRestrictions, setDietaryRestrictions] = useState<any[]>([]);
+
   useEffect(() => {
     const loadInitialData = async () => {
+      if (!user?.uid || !currentFamily) return;
+      
       try {
-        const [membersData, cuisinesData] = await Promise.all([
-          familyMembersApi.getAll(),
-          referenceDataApi.getCuisines()
+        const [membersData, cuisinesData, restrictionsData, restaurantsData, favoritesData, commentsData] = await Promise.all([
+          familyMembersService.getAll(currentFamily.id),
+          referenceDataService.getCuisines(),
+          referenceDataService.getDietaryRestrictions(),
+          restaurantsService.getAll(),
+          favoritesService.getUserFavorites(user.uid),
+          commentsService.getUserComments(user.uid)
         ]);
         setFamilyMembers(membersData);
         setCuisines(cuisinesData);
+        setDietaryRestrictions(restrictionsData);
+        setRestaurants(restaurantsData);
+        setFavorites(favoritesData);
+        setComments(commentsData);
       } catch (err) {
         setError('Failed to load initial data');
         console.error('Error loading initial data:', err);
@@ -39,9 +57,9 @@ export default function RecommendationsPage() {
     };
 
     loadInitialData();
-  }, []);
+  }, [user?.uid, currentFamily]);
 
-  const handleMemberToggle = (memberId: number) => {
+  const handleMemberToggle = (memberId: string) => {
     setSelectedMemberIds(prev => 
       prev.includes(memberId) 
         ? prev.filter(id => id !== memberId)
@@ -61,6 +79,32 @@ export default function RecommendationsPage() {
     setFilters(newFilters);
   };
 
+  const handleFavoriteToggle = async (restaurantId: string, isFavorite: boolean) => {
+    if (!user?.uid) return;
+    
+    try {
+      if (isFavorite) {
+        // Add to favorites
+        const newFavorite = await favoritesService.addFavorite(user.uid, restaurantId);
+        setFavorites(prev => [...prev, newFavorite]);
+      } else {
+        // Remove from favorites
+        await favoritesService.removeFavorite(user.uid, restaurantId);
+        setFavorites(prev => prev.filter(f => f.restaurantId !== restaurantId));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const isRestaurantFavorite = (restaurantId: string) => {
+    return favorites.some(f => f.restaurantId === restaurantId);
+  };
+
+  const getRestaurantComments = (restaurantId: string) => {
+    return comments.filter(c => c.restaurantId === restaurantId);
+  };
+
   const handleGetRecommendations = async () => {
     if (selectedMemberIds.length === 0) {
       setError('Please select at least one family member');
@@ -71,114 +115,67 @@ export default function RecommendationsPage() {
     setError(null);
     
     try {
-      const request: RecommendationRequest = {
-        memberIds: selectedMemberIds,
-        filters: Object.keys(filters).length > 0 ? filters : undefined
+      // Convert numeric cuisine IDs to strings for the service
+      const serviceFilters = filters.cuisineIds ? {
+        ...filters,
+        cuisineIds: filters.cuisineIds.map(id => id.toString())
+      } : filters;
+      
+      // Use the new RecommendationService instead of the old API
+      const response = RecommendationService.generateRecommendations(
+        restaurants,
+        familyMembers,
+        selectedMemberIds,
+        serviceFilters as any
+      );
+      
+      // Apply favorite boost (10% bump for favorited restaurants, capped at 100%)
+      const boostRecommendations = (recs: any[]) => {
+        return recs.map(rec => {
+          const isFavorite = isRestaurantFavorite(rec.restaurant.id);
+          if (isFavorite) {
+            const boostedPercentage = Math.min(100, rec.percentage + 10);
+            return {
+              ...rec,
+              percentage: boostedPercentage,
+              score: (boostedPercentage / 100) * rec.maxPossible
+            };
+          }
+          return rec;
+        }).sort((a, b) => b.percentage - a.percentage); // Re-sort by new percentages
       };
       
-      const response = await recommendationsApi.getRecommendations(request);
+      // Apply boosts to the main response
+      const boostedResponse = {
+        ...response,
+        recommendations: boostRecommendations(response.recommendations)
+      };
       
-      // If no perfect matches found, try fallback strategies
-      if (response.recommendations.length === 0) {
-        console.log('No perfect matches found, trying fallback strategies...');
+      // If no recommendations found, try with relaxed filters
+      if (boostedResponse.recommendations.length === 0 && Object.keys(filters).length > 0) {
+        console.log('No matches found with filters, trying without filters...');
         
-        // Strategy 1: Remove price and rating filters first
-        if (filters.maxPriceRange || filters.minRating) {
-          const fallbackRequest1: RecommendationRequest = {
-            memberIds: selectedMemberIds,
-            filters: filters.cuisineIds && filters.cuisineIds.length > 0 ? 
-              { cuisineIds: filters.cuisineIds } : undefined
+        const fallbackResponse = RecommendationService.generateRecommendations(
+          restaurants,
+          familyMembers,
+          selectedMemberIds,
+          {} // No filters
+        );
+        
+        if (fallbackResponse.recommendations.length > 0) {
+          // Apply favorite boost to fallback recommendations too
+          const boostedFallbackResponse = {
+            ...fallbackResponse,
+            recommendations: boostRecommendations(fallbackResponse.recommendations),
+            fallbackMode: 'all_filters_removed' as const,
+            originalFilters: filters as any
           };
-          
-          const fallbackResponse1 = await recommendationsApi.getRecommendations(fallbackRequest1);
-          if (fallbackResponse1.recommendations.length > 0) {
-            setRecommendations({
-              ...fallbackResponse1,
-              fallbackMode: 'filters_removed',
-              originalFilters: filters
-            });
-          } else {
-            // Strategy 2: Remove all filters
-            const fallbackRequest2: RecommendationRequest = {
-              memberIds: selectedMemberIds
-            };
-            
-            const fallbackResponse2 = await recommendationsApi.getRecommendations(fallbackRequest2);
-            if (fallbackResponse2.recommendations.length > 0) {
-              setRecommendations({
-                ...fallbackResponse2,
-                fallbackMode: 'all_filters_removed',
-                originalFilters: filters
-              });
-            } else {
-              // Strategy 3: Try with fewer members (remove the most restrictive member)
-              const memberRestrictionCounts = selectedMembers.map(member => ({
-                id: member.id,
-                name: member.name,
-                restrictionCount: member.dietaryRestrictions?.length || 0
-              })).sort((a, b) => b.restrictionCount - a.restrictionCount);
-              
-              if (memberRestrictionCounts.length > 1) {
-                // Remove the member with the most restrictions
-                const reducedMemberIds = selectedMemberIds.filter(id => 
-                  id !== memberRestrictionCounts[0].id
-                );
-                
-                const fallbackRequest3: RecommendationRequest = {
-                  memberIds: reducedMemberIds
-                };
-                
-                const fallbackResponse3 = await recommendationsApi.getRecommendations(fallbackRequest3);
-                if (fallbackResponse3.recommendations.length > 0) {
-                  setRecommendations({
-                    ...fallbackResponse3,
-                    fallbackMode: 'member_removed',
-                    removedMember: memberRestrictionCounts[0],
-                    originalMemberIds: selectedMemberIds
-                  });
-                } else {
-                  // No fallback worked
-                  setRecommendations(response);
-                }
-              } else {
-                setRecommendations(response);
-              }
-            }
-          }
+          setRecommendations(boostedFallbackResponse);
         } else {
-          // No filters to remove, try member reduction
-          const memberRestrictionCounts = selectedMembers.map(member => ({
-            id: member.id,
-            name: member.name,
-            restrictionCount: member.dietaryRestrictions?.length || 0
-          })).sort((a, b) => b.restrictionCount - a.restrictionCount);
-          
-          if (memberRestrictionCounts.length > 1) {
-            const reducedMemberIds = selectedMemberIds.filter(id => 
-              id !== memberRestrictionCounts[0].id
-            );
-            
-            const fallbackRequest: RecommendationRequest = {
-              memberIds: reducedMemberIds
-            };
-            
-            const fallbackResponse = await recommendationsApi.getRecommendations(fallbackRequest);
-            if (fallbackResponse.recommendations.length > 0) {
-              setRecommendations({
-                ...fallbackResponse,
-                fallbackMode: 'member_removed',
-                removedMember: memberRestrictionCounts[0],
-                originalMemberIds: selectedMemberIds
-              });
-            } else {
-              setRecommendations(response);
-            }
-          } else {
-            setRecommendations(response);
-          }
+          setRecommendations(boostedResponse);
         }
       } else {
-        setRecommendations(response);
+        setRecommendations(boostedResponse);
       }
       
       // Auto-scroll to recommendations after a short delay
@@ -255,6 +252,8 @@ export default function RecommendationsPage() {
                     member={member}
                     isSelected={selectedMemberIds.includes(member.id)}
                     onToggle={handleMemberToggle}
+                    cuisines={cuisines}
+                    dietaryRestrictions={dietaryRestrictions}
                   />
                 ))}
               </div>
@@ -317,6 +316,8 @@ export default function RecommendationsPage() {
             selectedMembers={selectedMembers}
             summary={recommendations?.summary}
             resultsCount={recommendations?.recommendations.length}
+            cuisines={cuisines}
+            dietaryRestrictions={dietaryRestrictions}
           />
         </div>
       </div>
@@ -410,6 +411,9 @@ export default function RecommendationsPage() {
                 <RecommendationCard
                   recommendation={recommendation}
                   totalMembers={selectedMembers.length}
+                  isFavorite={isRestaurantFavorite(recommendation.restaurant.id)}
+                  userComments={getRestaurantComments(recommendation.restaurant.id)}
+                  onFavoriteToggle={handleFavoriteToggle}
                 />
               </div>
             ))}

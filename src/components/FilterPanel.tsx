@@ -6,12 +6,12 @@ interface FilterPanelProps {
   filters: {
     maxPriceRange?: number;
     minRating?: number;
-    cuisineIds?: number[];
+    cuisineIds?: string[];
   };
   onFiltersChange: (filters: {
     maxPriceRange?: number;
     minRating?: number;
-    cuisineIds?: number[];
+    cuisineIds?: string[];
   }) => void;
 }
 
@@ -26,7 +26,7 @@ export default function FilterPanel({ cuisines, filters, onFiltersChange }: Filt
     onFiltersChange({ ...filters, minRating: value });
   };
 
-  const handleCuisineToggle = (cuisineId: number) => {
+  const handleCuisineToggle = (cuisineId: string) => {
     const currentCuisines = filters.cuisineIds || [];
     const newCuisines = currentCuisines.includes(cuisineId)
       ? currentCuisines.filter(id => id !== cuisineId)

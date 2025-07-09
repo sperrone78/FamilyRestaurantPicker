@@ -4,7 +4,7 @@ import { ApiResponse, DietaryRestriction } from '../types';
 
 const router = express.Router();
 
-router.get('/', async (req, res: express.Response<ApiResponse<DietaryRestriction[]>>, next) => {
+router.get('/', async (_req, res: express.Response<ApiResponse<DietaryRestriction[]>>, next) => {
   try {
     const restrictions = await DietaryRestrictionModel.findAll();
     res.json({

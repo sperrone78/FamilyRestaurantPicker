@@ -3,9 +3,7 @@ import { db } from '../database/connection';
 import { 
   FamilyMember, 
   CreateFamilyMemberRequest, 
-  UpdateFamilyMemberRequest,
-  DietaryRestriction,
-  CuisinePreference
+  UpdateFamilyMemberRequest
 } from '../types';
 
 export class FamilyMemberModel {
@@ -60,12 +58,12 @@ export class FamilyMemberModel {
       id: member.id,
       name: member.name,
       email: member.email,
-      dietaryRestrictions: restrictionsResult.rows.map(row => ({
+      dietaryRestrictions: restrictionsResult.rows.map((row: any) => ({
         id: row.id,
         name: row.name,
         description: row.description
       })),
-      cuisinePreferences: preferencesResult.rows.map(row => ({
+      cuisinePreferences: preferencesResult.rows.map((row: any) => ({
         cuisineId: row.cuisine_id,
         cuisineName: row.cuisine_name,
         preferenceLevel: row.preference_level

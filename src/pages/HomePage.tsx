@@ -30,16 +30,16 @@ export default function HomePage() {
 
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Add Restaurants
+            View Restaurants
           </h3>
           <p className="text-gray-600 mb-4">
-            Build your restaurant database with dietary accommodations and details.
+            Browse our restaurant database with dietary accommodations and details.
           </p>
           <Link
             to="/restaurants"
             className="inline-block bg-primary-500 text-white px-4 py-2 rounded hover:bg-primary-600"
           >
-            Add Restaurants
+            View Restaurants
           </Link>
         </div>
 

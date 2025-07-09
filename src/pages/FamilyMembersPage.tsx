@@ -1,21 +1,29 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { familyMembersApi } from '../services/api';
+import { familyMembersApi, referenceDataApi } from '../services/api';
 import { FamilyMember, CreateFamilyMemberRequest } from '../types';
 import FamilyMemberCard from '../components/FamilyMemberCard';
 import FamilyMemberForm from '../components/FamilyMemberForm';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function FamilyMembersPage() {
+  const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | undefined>();
   const queryClient = useQueryClient();
 
   const { data: members = [], isLoading, error } = useQuery(
     'familyMembers',
-    familyMembersApi.getAll
+    () => familyMembersApi.getAll(user?.uid || ''),
+    { enabled: !!user?.uid }
   );
 
-  const createMutation = useMutation(familyMembersApi.create, {
+  const { data: cuisines = [] } = useQuery('cuisines', referenceDataApi.getCuisines);
+  const { data: dietaryRestrictions = [] } = useQuery('dietaryRestrictions', referenceDataApi.getDietaryRestrictions);
+
+  const createMutation = useMutation(
+    (data: CreateFamilyMemberRequest) => familyMembersApi.create(user?.uid || '', data),
+    {
     onSuccess: () => {
       queryClient.invalidateQueries('familyMembers');
       setShowForm(false);
@@ -27,7 +35,7 @@ export default function FamilyMembersPage() {
   });
 
   const updateMutation = useMutation(
-    ({ id, data }: { id: number; data: CreateFamilyMemberRequest }) =>
+    ({ id, data }: { id: string; data: CreateFamilyMemberRequest }) =>
       familyMembersApi.update(id, data),
     {
       onSuccess: () => {
@@ -63,7 +71,7 @@ export default function FamilyMembersPage() {
     setShowForm(true);
   };
 
-  const handleDelete = (memberId: number) => {
+  const handleDelete = (memberId: string) => {
     if (window.confirm('Are you sure you want to delete this family member?')) {
       deleteMutation.mutate(memberId);
     }
@@ -160,24 +168,26 @@ export default function FamilyMembersPage() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               isDeleting={deleteMutation.isLoading}
+              cuisines={cuisines}
+              dietaryRestrictions={dietaryRestrictions}
             />
           ))}
         </div>
       )}
 
-      {createMutation.error && (
+      {!!createMutation.error && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-red-800">Failed to save family member. Please try again.</p>
         </div>
       )}
 
-      {updateMutation.error && (
+      {!!updateMutation.error && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-red-800">Failed to update family member. Please try again.</p>
         </div>
       )}
 
-      {deleteMutation.error && (
+      {!!deleteMutation.error && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
           <p className="text-red-800">Failed to delete family member. Please try again.</p>
         </div>

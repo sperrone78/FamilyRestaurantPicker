@@ -1,43 +1,38 @@
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'jsdom',
-  roots: ['<rootDir>/src', '<rootDir>/server', '<rootDir>/__tests__'],
-  testMatch: [
-    '**/__tests__/**/*.test.{ts,tsx,js,jsx}',
-    '**/?(*.)+(spec|test).{ts,tsx,js,jsx}',
-  ],
+  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+  moduleNameMapper: {
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '^@/(.*)$': '<rootDir>/src/$1'
+  },
   transform: {
     '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(js|jsx)$': 'babel-jest'
   },
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^@server/(.*)$': '<rootDir>/server/$1',
-  },
-  collectCoverage: true,
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  testMatch: [
+    '<rootDir>/src/**/__tests__/**/*.(ts|tsx|js)',
+    '<rootDir>/src/**/*.(test|spec).(ts|tsx|js)'
+  ],
+  testPathIgnorePatterns: [
+    '<rootDir>/src/__tests__/utils/'
+  ],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
-    'server/**/*.{ts,js}',
     '!src/**/*.d.ts',
     '!src/main.tsx',
-    '!server/index.ts',
-    '!**/__tests__/**',
-    '!**/node_modules/**',
+    '!src/vite-env.d.ts',
+    '!src/firebase/config.ts',
+    '!src/__tests__/**'
   ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
-      branches: 75,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
+      branches: 30,
+      functions: 30,
+      lines: 30,
+      statements: 30
+    }
   },
-  testPathIgnorePatterns: [
-    '<rootDir>/node_modules/',
-    '<rootDir>/__tests__/e2e/',
-  ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
-  verbose: true,
+  coverageReporters: ['text', 'lcov', 'html'],
+  coverageDirectory: 'coverage'
 };

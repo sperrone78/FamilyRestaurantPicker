@@ -15,7 +15,25 @@
       "WebFetch(domain:www.visitbn.org)",
       "Bash(npx tsc:*)",
       "Bash(npx vite:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(find:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(rm:*)",
+      "Bash(ls:*)",
+      "Bash(mv:*)",
+      "Bash(test:*)",
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(npm test)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:wanderlog.com)",
+      "WebFetch(domain:directory.eatlocalbn.com)",
+      "WebFetch(domain:www.eatlocalbn.com)",
+      "Bash(rg:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm:*)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)"
     ],
     "deny": []
   }
