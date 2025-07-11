@@ -1,88 +1,88 @@
-import express from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
-import { AuthenticatedRequest } from '../middleware/auth';
-import { FamilyService } from '../services/familyService';
+import express from "express";
+import {getFirestore} from "firebase-admin/firestore";
+import {AuthenticatedRequest} from "../middleware/auth";
+import {FamilyService} from "../services/familyService";
 
 const router = express.Router();
 const db = getFirestore();
 
 // Get all restaurants for user's family
-router.get('/', async (req: AuthenticatedRequest, res) => {
+router.get("/", async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.uid;
     const family = await FamilyService.getUserPrimaryFamily(userId);
-    
+
     if (!family) {
       return res.status(404).json({
         success: false,
-        error: { message: 'No family found', code: 'FAMILY_NOT_FOUND' }
+        error: {message: "No family found", code: "FAMILY_NOT_FOUND"},
       });
     }
 
     let query = db
-      .collection('restaurants')
-      .where('familyId', '==', family.id);
+      .collection("restaurants")
+      .where("familyId", "==", family.id);
 
     // Apply filters if provided
-    const { cuisine, dietary, rating } = req.query;
-    
+    const {cuisine, dietary, rating} = req.query;
+
     if (cuisine) {
-      query = query.where('cuisine.id', '==', cuisine as string);
+      query = query.where("cuisine.id", "==", cuisine as string);
     }
-    
+
     if (rating) {
-      query = query.where('rating', '>=', parseFloat(rating as string));
+      query = query.where("rating", ">=", parseFloat(rating as string));
     }
 
     const restaurantsSnapshot = await query
-      .orderBy('rating', 'desc')
-      .orderBy('name', 'asc')
+      .orderBy("rating", "desc")
+      .orderBy("name", "asc")
       .get();
 
-    let restaurants = restaurantsSnapshot.docs.map(doc => ({
+    let restaurants = restaurantsSnapshot.docs.map((doc) => ({
       id: doc.id,
-      ...doc.data()
+      ...doc.data(),
     }));
 
     // Filter by dietary restrictions if specified (client-side filtering for complex queries)
     if (dietary) {
-      restaurants = restaurants.filter(restaurant => 
+      restaurants = restaurants.filter((restaurant) =>
         restaurant.dietaryAccommodations?.some((acc: any) => acc.id === dietary)
       );
     }
 
     res.json({
       success: true,
-      data: restaurants
+      data: restaurants,
     });
   } catch (error) {
-    console.error('Error fetching restaurants:', error);
+    console.error("Error fetching restaurants:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Internal server error', code: 'INTERNAL_ERROR' }
+      error: {message: "Internal server error", code: "INTERNAL_ERROR"},
     });
   }
 });
 
 // Create new restaurant
-router.post('/', async (req: AuthenticatedRequest, res) => {
+router.post("/", async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.uid;
     const family = await FamilyService.getUserPrimaryFamily(userId);
-    
+
     if (!family) {
       return res.status(404).json({
         success: false,
-        error: { message: 'No family found', code: 'FAMILY_NOT_FOUND' }
+        error: {message: "No family found", code: "FAMILY_NOT_FOUND"},
       });
     }
 
-    const restaurantRef = db.collection('restaurants').doc();
+    const restaurantRef = db.collection("restaurants").doc();
     const restaurantData = {
       ...req.body,
       familyId: family.id,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await restaurantRef.set(restaurantData);
@@ -91,45 +91,45 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
       success: true,
       data: {
         id: restaurantRef.id,
-        ...restaurantData
-      }
+        ...restaurantData,
+      },
     });
   } catch (error) {
-    console.error('Error creating restaurant:', error);
+    console.error("Error creating restaurant:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Internal server error', code: 'INTERNAL_ERROR' }
+      error: {message: "Internal server error", code: "INTERNAL_ERROR"},
     });
   }
 });
 
 // Update restaurant
-router.put('/:id', async (req: AuthenticatedRequest, res) => {
+router.put("/:id", async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.uid;
     const restaurantId = req.params.id;
     const family = await FamilyService.getUserPrimaryFamily(userId);
-    
+
     if (!family) {
       return res.status(404).json({
         success: false,
-        error: { message: 'No family found', code: 'FAMILY_NOT_FOUND' }
+        error: {message: "No family found", code: "FAMILY_NOT_FOUND"},
       });
     }
 
-    const restaurantRef = db.collection('restaurants').doc(restaurantId);
+    const restaurantRef = db.collection("restaurants").doc(restaurantId);
     const restaurantDoc = await restaurantRef.get();
 
     if (!restaurantDoc.exists || restaurantDoc.data()?.familyId !== family.id) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Restaurant not found', code: 'RESTAURANT_NOT_FOUND' }
+        error: {message: "Restaurant not found", code: "RESTAURANT_NOT_FOUND"},
       });
     }
 
     const updateData = {
       ...req.body,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await restaurantRef.update(updateData);
@@ -139,39 +139,39 @@ router.put('/:id', async (req: AuthenticatedRequest, res) => {
       success: true,
       data: {
         id: updatedDoc.id,
-        ...updatedDoc.data()
-      }
+        ...updatedDoc.data(),
+      },
     });
   } catch (error) {
-    console.error('Error updating restaurant:', error);
+    console.error("Error updating restaurant:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Internal server error', code: 'INTERNAL_ERROR' }
+      error: {message: "Internal server error", code: "INTERNAL_ERROR"},
     });
   }
 });
 
 // Delete restaurant
-router.delete('/:id', async (req: AuthenticatedRequest, res) => {
+router.delete("/:id", async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.uid;
     const restaurantId = req.params.id;
     const family = await FamilyService.getUserPrimaryFamily(userId);
-    
+
     if (!family) {
       return res.status(404).json({
         success: false,
-        error: { message: 'No family found', code: 'FAMILY_NOT_FOUND' }
+        error: {message: "No family found", code: "FAMILY_NOT_FOUND"},
       });
     }
 
-    const restaurantRef = db.collection('restaurants').doc(restaurantId);
+    const restaurantRef = db.collection("restaurants").doc(restaurantId);
     const restaurantDoc = await restaurantRef.get();
 
     if (!restaurantDoc.exists || restaurantDoc.data()?.familyId !== family.id) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Restaurant not found', code: 'RESTAURANT_NOT_FOUND' }
+        error: {message: "Restaurant not found", code: "RESTAURANT_NOT_FOUND"},
       });
     }
 
@@ -179,15 +179,15 @@ router.delete('/:id', async (req: AuthenticatedRequest, res) => {
 
     res.json({
       success: true,
-      data: { message: 'Restaurant deleted successfully' }
+      data: {message: "Restaurant deleted successfully"},
     });
   } catch (error) {
-    console.error('Error deleting restaurant:', error);
+    console.error("Error deleting restaurant:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Internal server error', code: 'INTERNAL_ERROR' }
+      error: {message: "Internal server error", code: "INTERNAL_ERROR"},
     });
   }
 });
 
-export { router as restaurantsRouter };
+export {router as restaurantsRouter};

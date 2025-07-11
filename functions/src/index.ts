@@ -40,12 +40,12 @@ app.use(cors({origin: true}));
 app.use(express.json());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({success: true, message: 'API is running'});
+app.get("/health", (req, res) => {
+  res.json({success: true, message: "API is running"});
 });
 
 // Protected routes
-app.use('/api/family-members', verifyAuth, familyMembersRouter);
-app.use('/api/restaurants', verifyAuth, restaurantsRouter);
+app.use("/api/family-members", verifyAuth, familyMembersRouter);
+app.use("/api/restaurants", verifyAuth, restaurantsRouter);
 
 export const api = onRequest({maxInstances: 10}, app);
