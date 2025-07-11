@@ -105,10 +105,13 @@ export default function FamilyMemberForm({ member, onSubmit, onCancel, isLoading
               type="text"
               id="name"
               required
+              maxLength={100}
+              pattern="[a-zA-Z\s\-'\.]*"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="Enter family member's name"
+              title="Name can only contain letters, spaces, hyphens, apostrophes, and periods"
             />
           </div>
           <div>
@@ -118,6 +121,7 @@ export default function FamilyMemberForm({ member, onSubmit, onCancel, isLoading
             <input
               type="email"
               id="email"
+              maxLength={254}
               value={formData.email}
               onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"

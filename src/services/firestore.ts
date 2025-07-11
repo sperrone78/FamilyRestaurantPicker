@@ -41,6 +41,17 @@ export const familyMembersService = {
   },
 
   async create(data: CreateFamilyMemberRequest & { familyId: string }): Promise<FamilyMember> {
+    // Check current family size before adding new member
+    const currentMembersQuery = query(
+      collection(db, 'familyMembers'),
+      where('familyId', '==', data.familyId)
+    );
+    const currentMembersSnapshot = await getDocs(currentMembersQuery);
+    
+    if (currentMembersSnapshot.size >= 10) {
+      throw new Error('Family size limit reached (maximum 10 members)');
+    }
+
     const docRef = await addDoc(collection(db, 'familyMembers'), {
       ...data,
       createdAt: new Date().toISOString(),
@@ -117,8 +128,22 @@ export const restaurantsService = {
     return snapshot.docs.map(doc => {
       const data = doc.data();
       
-      // Populate cuisine object from cuisineId
-      const cuisine = data.cuisineId ? cuisineMap.get(data.cuisineId) : undefined;
+      // Populate cuisine objects from cuisineIds (new) or cuisineId (backward compatibility)
+      let cuisine: any = undefined;
+      let cuisines: any[] = [];
+      
+      if (data.cuisineIds && Array.isArray(data.cuisineIds)) {
+        // New format: multiple cuisines
+        cuisines = data.cuisineIds
+          .map((id: string) => cuisineMap.get(id))
+          .filter(Boolean);
+        // Keep first cuisine for backward compatibility
+        cuisine = cuisines[0];
+      } else if (data.cuisineId) {
+        // Old format: single cuisine
+        cuisine = cuisineMap.get(data.cuisineId);
+        cuisines = cuisine ? [cuisine] : [];
+      }
       
       // Populate dietary accommodations (stored as array of objects with dietaryRestrictionId)
       const dietaryAccommodations = data.dietaryAccommodations 
@@ -137,6 +162,7 @@ export const restaurantsService = {
         id: doc.id,
         ...data,
         cuisine,
+        cuisines,
         dietaryAccommodations
       } as Restaurant;
     });

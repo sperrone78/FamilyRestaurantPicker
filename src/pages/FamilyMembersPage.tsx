@@ -10,6 +10,7 @@ export default function FamilyMembersPage() {
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: members = [], isLoading, error } = useQuery(
@@ -28,9 +29,12 @@ export default function FamilyMembersPage() {
       queryClient.invalidateQueries('familyMembers');
       setShowForm(false);
       setEditingMember(undefined);
+      setErrorMessage(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Failed to create family member:', error);
+      const errorMsg = error?.message || 'Failed to create family member';
+      setErrorMessage(errorMsg);
     },
   });
 
@@ -42,9 +46,12 @@ export default function FamilyMembersPage() {
         queryClient.invalidateQueries('familyMembers');
         setShowForm(false);
         setEditingMember(undefined);
+        setErrorMessage(null);
       },
-      onError: (error) => {
+      onError: (error: any) => {
         console.error('Failed to update family member:', error);
+        const errorMsg = error?.message || 'Failed to update family member';
+        setErrorMessage(errorMsg);
       },
     }
   );
@@ -52,9 +59,12 @@ export default function FamilyMembersPage() {
   const deleteMutation = useMutation(familyMembersApi.delete, {
     onSuccess: () => {
       queryClient.invalidateQueries('familyMembers');
+      setErrorMessage(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Failed to delete family member:', error);
+      const errorMsg = error?.message || 'Failed to delete family member';
+      setErrorMessage(errorMsg);
     },
   });
 
@@ -85,6 +95,7 @@ export default function FamilyMembersPage() {
   const handleAddNew = () => {
     setEditingMember(undefined);
     setShowForm(true);
+    setErrorMessage(null);
   };
 
   if (error) {
@@ -105,13 +116,24 @@ export default function FamilyMembersPage() {
           <h1 className="text-3xl font-bold text-gray-900">Family Members</h1>
           <p className="text-gray-600 mt-2">
             Manage your family members and their dining preferences.
+            {members.length > 0 && (
+              <span className="ml-2 text-sm">
+                ({members.length}/10 members)
+              </span>
+            )}
           </p>
         </div>
         {!showForm && (
           <button
             onClick={handleAddNew}
-            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={members.length >= 10}
+            className={`px-4 py-2 rounded-md focus:outline-none focus:ring-2 ${
+              members.length >= 10
+                ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                : 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500'
+            }`}
             data-testid="add-member-btn"
+            title={members.length >= 10 ? 'Maximum 10 family members allowed' : ''}
           >
             Add Family Member
           </button>
@@ -153,7 +175,13 @@ export default function FamilyMembersPage() {
           {!showForm && (
             <button
               onClick={handleAddNew}
-              className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              disabled={members.length >= 10}
+              className={`px-4 py-2 rounded-md focus:outline-none focus:ring-2 ${
+                members.length >= 10
+                  ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                  : 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500'
+              }`}
+              title={members.length >= 10 ? 'Maximum 10 family members allowed' : ''}
             >
               Add Your First Family Member
             </button>
@@ -175,21 +203,9 @@ export default function FamilyMembersPage() {
         </div>
       )}
 
-      {!!createMutation.error && (
+      {errorMessage && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-800">Failed to save family member. Please try again.</p>
-        </div>
-      )}
-
-      {!!updateMutation.error && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-800">Failed to update family member. Please try again.</p>
-        </div>
-      )}
-
-      {!!deleteMutation.error && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-800">Failed to delete family member. Please try again.</p>
+          <p className="text-red-800">{errorMessage}</p>
         </div>
       )}
     </div>

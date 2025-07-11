@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { RestaurantComment, CreateCommentRequest, UpdateCommentRequest } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { commentsService } from '../services/firestore';
@@ -199,7 +200,15 @@ export default function RestaurantComments({ restaurantId }: RestaurantCommentsP
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                <p 
+                  className="text-gray-700 whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{ 
+                    __html: DOMPurify.sanitize(comment.content, { 
+                      ALLOWED_TAGS: [],
+                      ALLOWED_ATTR: [] 
+                    })
+                  }}
+                />
               )}
             </div>
           ))

@@ -38,14 +38,26 @@ export default function RestaurantsPage() {
       const matchesSearch = (
         restaurant.name.toLowerCase().includes(searchTerm) ||
         restaurant.address?.toLowerCase().includes(searchTerm) ||
-        restaurant.notes?.toLowerCase().includes(searchTerm)
+        restaurant.notes?.toLowerCase().includes(searchTerm) ||
+        // Search through multiple cuisines
+        restaurant.cuisines?.some(cuisine => 
+          cuisine.name.toLowerCase().includes(searchTerm)
+        ) ||
+        // Fallback to single cuisine for backward compatibility
+        restaurant.cuisine?.name.toLowerCase().includes(searchTerm)
       );
       if (!matchesSearch) return false;
     }
     
-    // Cuisine filter
+    // Cuisine filter - check multiple cuisines
     if (filters.cuisine) {
-      if (restaurant.cuisine?.id !== filters.cuisine) return false;
+      const hasMatchingCuisine = (
+        // Check multiple cuisines array
+        restaurant.cuisines?.some(cuisine => cuisine.id === filters.cuisine) ||
+        // Fallback to single cuisine for backward compatibility
+        restaurant.cuisine?.id === filters.cuisine
+      );
+      if (!hasMatchingCuisine) return false;
     }
     
     // Dietary restriction filter
@@ -152,7 +164,7 @@ export default function RestaurantsPage() {
               id="search"
               value={filters.search || ''}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              placeholder="Restaurant name, location..."
+              placeholder="Restaurant name, cuisine, location..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>

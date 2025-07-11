@@ -138,9 +138,14 @@ export const recommendationsApi = {
           return false;
         }
         
-        // Apply cuisine filter
+        // Apply cuisine filter - check against all restaurant cuisines
         if (request.filters?.cuisineIds && request.filters.cuisineIds.length > 0) {
-          if (!restaurant.cuisine?.id || !request.filters.cuisineIds.includes(restaurant.cuisine.id)) {
+          const restaurantCuisines = restaurant.cuisines || (restaurant.cuisine ? [restaurant.cuisine] : []);
+          const hasMatchingCuisine = restaurantCuisines.some(cuisine => 
+            request.filters!.cuisineIds!.includes(cuisine.id)
+          );
+          
+          if (!hasMatchingCuisine) {
             return false;
           }
         }
@@ -203,13 +208,23 @@ function calculateRestaurantScore(
   
   for (const member of members) {
     if (member.cuisinePreferences) {
-      const hasThisCuisinePreference = member.cuisinePreferences.some(pref => pref.cuisineId === restaurant.cuisine?.id);
-      if (hasThisCuisinePreference) {
-        maxCuisineScore += 50; // Max 50 points per member with this cuisine preference
-        const pref = member.cuisinePreferences.find(pref => pref.cuisineId === restaurant.cuisine?.id);
+      // Check against all cuisines (new format) or single cuisine (backward compatibility)
+      const restaurantCuisines = restaurant.cuisines || (restaurant.cuisine ? [restaurant.cuisine] : []);
+      
+      let memberHasMatchingCuisine = false;
+      let bestPreferenceLevel = 0;
+      
+      for (const restaurantCuisine of restaurantCuisines) {
+        const pref = member.cuisinePreferences.find(pref => pref.cuisineId === restaurantCuisine.id);
         if (pref) {
-          cuisineScore += pref.preferenceLevel * 10;
+          memberHasMatchingCuisine = true;
+          bestPreferenceLevel = Math.max(bestPreferenceLevel, pref.preferenceLevel);
         }
+      }
+      
+      if (memberHasMatchingCuisine) {
+        maxCuisineScore += 50; // Max 50 points per member with matching cuisine preference
+        cuisineScore += bestPreferenceLevel * 10;
       }
     }
   }
@@ -262,17 +277,29 @@ function generateReasons(
     reasons.push(`Accommodates ${accommodationCount} dietary restriction${accommodationCount > 1 ? 's' : ''}`);
   }
   
-  // Cuisine preferences
-  const cuisineName = restaurant.cuisine?.name;
-  if (cuisineName) {
-    const membersWhoLikeCuisine = members.filter(member => 
-      member.cuisinePreferences?.some(pref => 
-        pref.cuisineId === restaurant.cuisine?.id && pref.preferenceLevel >= 4
-      )
-    );
+  // Cuisine preferences - handle multiple cuisines
+  const restaurantCuisines = restaurant.cuisines || (restaurant.cuisine ? [restaurant.cuisine] : []);
+  
+  if (restaurantCuisines.length > 0) {
+    const likedCuisines = new Set<string>();
+    let totalMembersWhoLike = 0;
     
-    if (membersWhoLikeCuisine.length > 0) {
-      reasons.push(`${membersWhoLikeCuisine.length} member${membersWhoLikeCuisine.length > 1 ? 's' : ''} like${membersWhoLikeCuisine.length === 1 ? 's' : ''} ${cuisineName} cuisine`);
+    for (const cuisine of restaurantCuisines) {
+      const membersWhoLikeCuisine = members.filter(member => 
+        member.cuisinePreferences?.some(pref => 
+          pref.cuisineId === cuisine.id && pref.preferenceLevel >= 4
+        )
+      );
+      
+      if (membersWhoLikeCuisine.length > 0) {
+        likedCuisines.add(cuisine.name);
+        totalMembersWhoLike = Math.max(totalMembersWhoLike, membersWhoLikeCuisine.length);
+      }
+    }
+    
+    if (likedCuisines.size > 0) {
+      const cuisineNames = Array.from(likedCuisines).join(', ');
+      reasons.push(`${totalMembersWhoLike} member${totalMembersWhoLike > 1 ? 's' : ''} like${totalMembersWhoLike === 1 ? 's' : ''} ${cuisineNames} cuisine`);
     }
   }
   
@@ -297,10 +324,28 @@ function getAccommodatedMembers(restaurant: Restaurant, members: FamilyMember[])
         return accommodationIds.includes(restrictionId);
       });
       
-      // Check if member has positive preference for this cuisine (3+ rating)
+      // Check if member has positive preference for any of the restaurant's cuisines (3+ rating)
       const memberPreferences = member.cuisinePreferences || [];
-      const cuisinePreference = memberPreferences.find(pref => pref.cuisineId === restaurant.cuisine?.id);
-      const cuisinePreferenceMet = !cuisinePreference || cuisinePreference.preferenceLevel >= 3;
+      const restaurantCuisines = restaurant.cuisines || (restaurant.cuisine ? [restaurant.cuisine] : []);
+      
+      let cuisinePreferenceMet = true; // Default to true if no cuisines
+      let bestPreferenceLevel = 0;
+      
+      if (restaurantCuisines.length > 0) {
+        // Check if member has preference for any of the restaurant's cuisines
+        const matchingPreferences = memberPreferences.filter(pref => 
+          restaurantCuisines.some(cuisine => cuisine.id === pref.cuisineId)
+        );
+        
+        if (matchingPreferences.length > 0) {
+          // Member has preferences for some cuisines - check if any are positive (3+)
+          bestPreferenceLevel = Math.max(...matchingPreferences.map(pref => pref.preferenceLevel));
+          cuisinePreferenceMet = bestPreferenceLevel >= 3;
+        } else {
+          // Member has no preferences for any of the restaurant's cuisines - neutral
+          cuisinePreferenceMet = true;
+        }
+      }
       
       // Debug logging
       console.log(`Member ${member.name}:`, {
@@ -308,8 +353,8 @@ function getAccommodatedMembers(restaurant: Restaurant, members: FamilyMember[])
         memberRestrictionsRaw: memberRestrictions,
         accommodationIds,
         dietaryRequirementsMet,
-        cuisinePreference: cuisinePreference ? `${cuisinePreference.preferenceLevel}/5` : 'none',
-        restaurantCuisineId: restaurant.cuisine?.id,
+        restaurantCuisines: restaurantCuisines.map(c => c.name),
+        bestPreferenceLevel,
         cuisinePreferenceMet,
         finalResult: dietaryRequirementsMet && cuisinePreferenceMet
       });

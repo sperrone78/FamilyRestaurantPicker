@@ -2,6 +2,7 @@ import express from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { FamilyService } from '../services/familyService';
+import { validateRequest, createFamilyMemberSchema, updateFamilyMemberSchema } from '../validation/schemas';
 
 const router = express.Router();
 const db = getFirestore();
@@ -44,7 +45,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
 });
 
 // Create new family member
-router.post('/', async (req: AuthenticatedRequest, res) => {
+router.post('/', validateRequest(createFamilyMemberSchema), async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.uid;
     const family = await FamilyService.getUserPrimaryFamily(userId);
@@ -53,6 +54,19 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
       return res.status(404).json({
         success: false,
         error: { message: 'No family found', code: 'FAMILY_NOT_FOUND' }
+      });
+    }
+
+    // Check current family size
+    const currentMembersSnapshot = await db
+      .collection('familyMembers')
+      .where('familyId', '==', family.id)
+      .get();
+
+    if (currentMembersSnapshot.size >= 10) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Family size limit reached (maximum 10 members)', code: 'FAMILY_SIZE_LIMIT_EXCEEDED' }
       });
     }
 
@@ -88,7 +102,7 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
 });
 
 // Update family member
-router.put('/:id', async (req: AuthenticatedRequest, res) => {
+router.put('/:id', validateRequest(updateFamilyMemberSchema), async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.uid;
     const memberId = req.params.id;

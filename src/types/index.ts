@@ -52,7 +52,8 @@ export interface Restaurant {
   name: string;
   address?: string;
   phone?: string;
-  cuisine?: Cuisine;
+  cuisine?: Cuisine; // Keep for backward compatibility
+  cuisines?: Cuisine[]; // New: multiple cuisine tags
   priceRange?: number;
   rating?: number;
   website?: string;

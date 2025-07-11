@@ -144,7 +144,22 @@ export default function RecommendationCard({
             </div>
           </div>
           <div className="flex items-center space-x-4 text-sm text-gray-600">
-            {restaurant.cuisine && (
+            {/* Display multiple cuisine tags */}
+            {restaurant.cuisines && restaurant.cuisines.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {restaurant.cuisines.map((cuisine, index) => (
+                  <span
+                    key={cuisine.id || `cuisine-${index}`}
+                    className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full"
+                  >
+                    {cuisine.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            
+            {/* Fallback for backward compatibility */}
+            {!restaurant.cuisines && restaurant.cuisine && (
               <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
                 {restaurant.cuisine.name}
               </span>

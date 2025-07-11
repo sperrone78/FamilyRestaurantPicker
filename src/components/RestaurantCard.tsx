@@ -62,7 +62,22 @@ export default function RestaurantCard({ restaurant, onFavoriteToggle }: Restaur
                 </svg>
               </button>
             </div>
-            {restaurant.cuisine && (
+            {/* Display multiple cuisine tags */}
+            {restaurant.cuisines && restaurant.cuisines.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {restaurant.cuisines.map((cuisine, index) => (
+                  <span
+                    key={cuisine.id || `cuisine-${index}`}
+                    className="inline-block bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    {cuisine.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            
+            {/* Fallback for backward compatibility */}
+            {!restaurant.cuisines && restaurant.cuisine && (
               <span className="inline-block bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full">
                 {restaurant.cuisine.name}
               </span>
