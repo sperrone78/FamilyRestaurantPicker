@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery } from 'react-query';
 import { familyMembersService, referenceDataService, restaurantsService, favoritesService, commentsService, personalRatingsService } from '../services/firestore';
 import { RecommendationService } from '../services/recommendationService';
-import { FamilyMember, Cuisine, RecommendationResponse, Restaurant, RestaurantFavorite, RestaurantComment, PersonalRating } from '../types';
+import { FamilyMember, Cuisine, RecommendationResponse, Restaurant, RestaurantFavorite, RestaurantComment } from '../types';
 import MemberSelectionCard from '../components/MemberSelectionCard';
 import FilterPanel from '../components/FilterPanel';
 import RecommendationCard from '../components/RecommendationCard';
@@ -16,7 +17,6 @@ export default function RecommendationsPage() {
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<RestaurantFavorite[]>([]);
   const [comments, setComments] = useState<RestaurantComment[]>([]);
-  const [personalRatings, setPersonalRatings] = useState<PersonalRating[]>([]);
   const [filters, setFilters] = useState<{
     maxPriceRange?: number;
     minRating?: number;
@@ -30,19 +30,29 @@ export default function RecommendationsPage() {
 
   const [dietaryRestrictions, setDietaryRestrictions] = useState<any[]>([]);
 
+  // Use React Query for personal ratings to ensure fresh data
+  const { data: personalRatings = [] } = useQuery(
+    ['personalRatings', user?.uid],
+    () => user?.uid ? personalRatingsService.getUserRatings(user.uid) : Promise.resolve([]),
+    {
+      enabled: !!user?.uid,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+    }
+  );
+
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user?.uid || !currentFamily) return;
       
       try {
-        const [membersData, cuisinesData, restrictionsData, restaurantsData, favoritesData, commentsData, ratingsData] = await Promise.all([
+        const [membersData, cuisinesData, restrictionsData, restaurantsData, favoritesData, commentsData] = await Promise.all([
           familyMembersService.getAll(currentFamily.id),
           referenceDataService.getCuisines(),
           referenceDataService.getDietaryRestrictions(),
           restaurantsService.getAll(),
           favoritesService.getUserFavorites(user.uid),
-          commentsService.getUserComments(user.uid),
-          personalRatingsService.getUserRatings(user.uid)
+          commentsService.getUserComments(user.uid)
         ]);
         setFamilyMembers(membersData);
         setCuisines(cuisinesData);
@@ -50,7 +60,6 @@ export default function RecommendationsPage() {
         setRestaurants(restaurantsData);
         setFavorites(favoritesData);
         setComments(commentsData);
-        setPersonalRatings(ratingsData);
       } catch (err) {
         setError('Failed to load initial data');
         console.error('Error loading initial data:', err);
