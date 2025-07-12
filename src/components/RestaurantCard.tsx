@@ -170,7 +170,7 @@ export default function RestaurantCard({
           <div className="text-right ml-4">
             {/* Recommendation Score Badge */}
             {showRecommendationInfo && recommendationData && (
-              <div className={`px-3 py-1 rounded-full border text-sm font-medium mb-2 ${getScoreColor(recommendationData.percentage)}`}>
+              <div className={`px-3 py-1 rounded-full border text-sm font-medium mb-2 min-w-[60px] text-center ${getScoreColor(recommendationData.percentage)}`}>
                 {recommendationData.percentage}%
               </div>
             )}
