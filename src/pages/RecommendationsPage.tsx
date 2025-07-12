@@ -5,7 +5,7 @@ import { RecommendationService } from '../services/recommendationService';
 import { FamilyMember, Cuisine, RecommendationResponse, Restaurant, RestaurantFavorite, RestaurantComment } from '../types';
 import MemberSelectionCard from '../components/MemberSelectionCard';
 import FilterPanel from '../components/FilterPanel';
-import RecommendationCard from '../components/RecommendationCard';
+import RestaurantCard from '../components/RestaurantCard';
 import SummaryPanel from '../components/SummaryPanel';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -424,13 +424,22 @@ export default function RecommendationsPage() {
                     {index + 1}
                   </div>
                 )}
-                <RecommendationCard
-                  recommendation={recommendation}
-                  totalMembers={selectedMembers.length}
-                  isFavorite={isRestaurantFavorite(recommendation.restaurant.id)}
+                <RestaurantCard
+                  restaurant={{
+                    ...recommendation.restaurant,
+                    isFavorite: isRestaurantFavorite(recommendation.restaurant.id),
+                    personalRating: getPersonalRating(recommendation.restaurant.id)
+                  }}
                   userComments={getRestaurantComments(recommendation.restaurant.id)}
-                  personalRating={getPersonalRating(recommendation.restaurant.id)}
                   onFavoriteToggle={handleFavoriteToggle}
+                  recommendationData={{
+                    percentage: recommendation.percentage,
+                    reasons: recommendation.reasons,
+                    accommodatedMembers: recommendation.accommodatedMembers,
+                    missedRestrictions: recommendation.missedRestrictions
+                  }}
+                  totalMembers={selectedMembers.length}
+                  showRecommendationInfo={true}
                 />
               </div>
             ))}

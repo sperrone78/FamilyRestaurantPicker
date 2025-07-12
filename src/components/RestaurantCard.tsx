@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RestaurantWithUserData, RestaurantComment } from '../types';
+import { RestaurantWithUserData, RestaurantComment, DietaryRestriction } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../hooks/useAdmin';
 import RestaurantDetailsModal from './RestaurantDetailsModal';
@@ -13,6 +13,15 @@ interface RestaurantCardProps {
   onDelete?: (restaurantId: string) => void;
   onPersonalRatingChange?: (restaurantId: string, rating: number) => void;
   onPersonalRatingRemove?: (restaurantId: string) => void;
+  // Recommendation-specific props (optional)
+  recommendationData?: {
+    percentage: number;
+    reasons: string[];
+    accommodatedMembers: string[];
+    missedRestrictions: DietaryRestriction[];
+  };
+  totalMembers?: number;
+  showRecommendationInfo?: boolean;
 }
 
 export default function RestaurantCard({ 
@@ -22,7 +31,10 @@ export default function RestaurantCard({
   onEdit, 
   onDelete, 
   onPersonalRatingChange, 
-  onPersonalRatingRemove 
+  onPersonalRatingRemove,
+  recommendationData,
+  totalMembers,
+  showRecommendationInfo = false
 }: RestaurantCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
@@ -34,6 +46,12 @@ export default function RestaurantCard({
   const formatPriceRange = (priceRange?: number) => {
     if (!priceRange) return 'N/A';
     return '$'.repeat(priceRange);
+  };
+
+  const getScoreColor = (percentage: number) => {
+    if (percentage >= 80) return 'bg-green-100 text-green-800 border-green-200';
+    if (percentage >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    return 'bg-red-100 text-red-800 border-red-200';
   };
 
   const handlePersonalRatingChange = (rating: number) => {
@@ -150,6 +168,12 @@ export default function RestaurantCard({
             )}
           </div>
           <div className="text-right ml-4">
+            {/* Recommendation Score Badge */}
+            {showRecommendationInfo && recommendationData && (
+              <div className={`px-3 py-1 rounded-full border text-sm font-medium mb-2 ${getScoreColor(recommendationData.percentage)}`}>
+                {recommendationData.percentage}%
+              </div>
+            )}
             <div className="mb-1 flex justify-end">
               {user ? (
                 <div className="relative">
@@ -221,6 +245,55 @@ export default function RestaurantCard({
               ))}
             </div>
           </div>
+        )}
+
+        {/* Recommendation-specific sections */}
+        {showRecommendationInfo && recommendationData && (
+          <>
+            {/* Why this recommendation */}
+            {recommendationData.reasons.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Why this recommendation:</h4>
+                <div className="flex flex-wrap gap-1">
+                  {recommendationData.reasons.map((reason, index) => (
+                    <span
+                      key={index}
+                      className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full"
+                    >
+                      {reason}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Member accommodation status */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm text-gray-600">
+                      {recommendationData.accommodatedMembers.length}/{totalMembers || 1} members
+                    </span>
+                  </div>
+                  
+                  {recommendationData.missedRestrictions.length > 0 && recommendationData.missedRestrictions.some(r => r.name && r.name.trim()) && (
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm text-red-600">
+                        Missing: {recommendationData.missedRestrictions.filter(r => r.name && r.name.trim()).map(r => r.name).join(', ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         <div className="pt-4 border-t border-gray-200">
