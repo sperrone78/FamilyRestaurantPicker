@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from 'react-query';
-import { referenceDataService, favoritesService, restaurantsService, personalRatingsService } from '../services/firestore';
+import { referenceDataService, favoritesService, restaurantsService, personalRatingsService, commentsService } from '../services/firestore';
 import RestaurantCard from '../components/RestaurantCard';
 import RestaurantForm from '../components/RestaurantForm';
 import { AdminRoute } from '../components/AdminRoute';
@@ -35,6 +35,17 @@ export default function RestaurantsPage() {
 
   const { data: cuisines = [] } = useQuery('cuisines', referenceDataService.getCuisines);
   const { data: dietaryRestrictions = [] } = useQuery('dietaryRestrictions', referenceDataService.getDietaryRestrictions);
+  
+  // Query for user comments
+  const { data: userComments = [] } = useQuery(
+    ['comments', user?.uid],
+    () => user?.uid ? commentsService.getUserComments(user.uid) : Promise.resolve([]),
+    {
+      enabled: !!user?.uid,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+    }
+  );
 
   // Admin mutations
   const createRestaurantMutation = useMutation(
@@ -241,6 +252,10 @@ export default function RestaurantsPage() {
       // Revert the optimistic update on error
       updateFavoriteStatus(restaurantId, !isFavorite);
     }
+  };
+
+  const getRestaurantComments = (restaurantId: string) => {
+    return userComments.filter(c => c.restaurantId === restaurantId);
   };
 
   if (restaurantsError) {
@@ -491,6 +506,7 @@ export default function RestaurantsPage() {
             <RestaurantCard 
               key={restaurant.id} 
               restaurant={restaurant}
+              userComments={getRestaurantComments(restaurant.id)}
               onFavoriteToggle={handleFavoriteToggle}
               onEdit={isAdmin ? handleEditRestaurant : undefined}
               onDelete={isAdmin ? handleDeleteRestaurant : undefined}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RestaurantWithUserData } from '../types';
+import { RestaurantWithUserData, RestaurantComment } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../hooks/useAdmin';
 import RestaurantDetailsModal from './RestaurantDetailsModal';
@@ -7,6 +7,7 @@ import { StarRating } from './StarRating';
 
 interface RestaurantCardProps {
   restaurant: RestaurantWithUserData;
+  userComments?: RestaurantComment[];
   onFavoriteToggle?: (restaurantId: string, isFavorite: boolean) => Promise<void>;
   onEdit?: (restaurant: RestaurantWithUserData) => void;
   onDelete?: (restaurantId: string) => void;
@@ -16,6 +17,7 @@ interface RestaurantCardProps {
 
 export default function RestaurantCard({ 
   restaurant, 
+  userComments = [],
   onFavoriteToggle, 
   onEdit, 
   onDelete, 
@@ -24,6 +26,7 @@ export default function RestaurantCard({
 }: RestaurantCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const { user, currentFamily } = useAuth();
   const { isAdmin } = useAdmin();
   
@@ -72,20 +75,58 @@ export default function RestaurantCard({
               <h3 className="text-xl font-semibold text-gray-900">
                 {restaurant.name}
               </h3>
-              <button
-                onClick={handleFavoriteToggle}
-                disabled={isTogglingFavorite}
-                className={`p-2 rounded-full transition-colors ${
-                  isFavorite
-                    ? 'text-red-500 hover:text-red-600'
-                    : 'text-gray-400 hover:text-red-500'
-                } ${isTogglingFavorite ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-              >
-                <svg className="w-5 h-5" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
+              <div className="flex items-center space-x-2">
+                {/* Favorite Button */}
+                <button
+                  onClick={handleFavoriteToggle}
+                  disabled={isTogglingFavorite}
+                  className={`p-2 rounded-full transition-colors ${
+                    isFavorite
+                      ? 'text-red-500 hover:text-red-600'
+                      : 'text-gray-400 hover:text-red-500'
+                  } ${isTogglingFavorite ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <svg className="w-5 h-5" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </button>
+                
+                {/* Comments Indicator */}
+                {userComments.length > 0 && (
+                  <div 
+                    className="relative"
+                    onMouseEnter={() => setShowComments(true)}
+                    onMouseLeave={() => setShowComments(false)}
+                  >
+                    <button className="p-2 rounded-full text-blue-500 hover:text-blue-600">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.965 8.965 0 01-4.126-1.004L3 21l1.996-5.874A8.965 8.965 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+                      </svg>
+                    </button>
+                    <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {userComments.length}
+                    </span>
+                    
+                    {/* Comments Tooltip */}
+                    {showComments && (
+                      <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Your Comments</h4>
+                        <div className="max-h-40 overflow-y-auto space-y-2">
+                          {userComments.map((comment) => (
+                            <div key={comment.id} className="text-sm">
+                              <p className="text-gray-700">{comment.content}</p>
+                              <p className="text-gray-500 text-xs mt-1">
+                                {new Date(comment.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             {/* Display multiple cuisine tags */}
             {restaurant.cuisines && restaurant.cuisines.length > 0 && (
