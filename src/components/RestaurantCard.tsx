@@ -67,7 +67,7 @@ export default function RestaurantCard({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200">
+    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
       <div className="p-6">
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
@@ -110,7 +110,7 @@ export default function RestaurantCard({
                     
                     {/* Comments Tooltip */}
                     {showComments && (
-                      <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4">
+                      <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
                         <h4 className="font-semibold text-gray-900 mb-3">Your Comments</h4>
                         <div className="max-h-40 overflow-y-auto space-y-2">
                           {userComments.map((comment) => (
