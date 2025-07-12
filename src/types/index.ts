@@ -145,9 +145,58 @@ export interface UpdateCommentRequest {
   content: string;
 }
 
+export interface PersonalRating {
+  id: string;
+  userId: string;
+  restaurantId: string;
+  rating: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePersonalRatingRequest {
+  restaurantId: string;
+  rating: number;
+}
+
+export interface UpdatePersonalRatingRequest {
+  rating: number;
+}
+
 export interface RestaurantWithUserData extends Restaurant {
   isFavorite?: boolean;
   userComments?: RestaurantComment[];
+  personalRating?: PersonalRating;
+}
+
+export interface CreateRestaurantRequest {
+  name: string;
+  address?: string;
+  phone?: string;
+  cuisines?: string[];
+  priceRange?: number;
+  rating?: number;
+  website?: string;
+  notes?: string;
+  dietaryAccommodations?: {
+    dietaryRestrictionId: string;
+    notes?: string;
+  }[];
+}
+
+export interface UpdateRestaurantRequest {
+  name?: string;
+  address?: string;
+  phone?: string;
+  cuisines?: string[];
+  priceRange?: number;
+  rating?: number;
+  website?: string;
+  notes?: string;
+  dietaryAccommodations?: {
+    dietaryRestrictionId: string;
+    notes?: string;
+  }[];
 }
 
 export interface ApiResponse<T> {

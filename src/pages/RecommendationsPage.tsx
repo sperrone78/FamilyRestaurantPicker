@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { familyMembersService, referenceDataService, restaurantsService, favoritesService, commentsService } from '../services/firestore';
+import { familyMembersService, referenceDataService, restaurantsService, favoritesService, commentsService, personalRatingsService } from '../services/firestore';
 import { RecommendationService } from '../services/recommendationService';
-import { FamilyMember, Cuisine, RecommendationResponse, Restaurant, RestaurantFavorite, RestaurantComment } from '../types';
+import { FamilyMember, Cuisine, RecommendationResponse, Restaurant, RestaurantFavorite, RestaurantComment, PersonalRating } from '../types';
 import MemberSelectionCard from '../components/MemberSelectionCard';
 import FilterPanel from '../components/FilterPanel';
 import RecommendationCard from '../components/RecommendationCard';
@@ -16,6 +16,7 @@ export default function RecommendationsPage() {
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<RestaurantFavorite[]>([]);
   const [comments, setComments] = useState<RestaurantComment[]>([]);
+  const [personalRatings, setPersonalRatings] = useState<PersonalRating[]>([]);
   const [filters, setFilters] = useState<{
     maxPriceRange?: number;
     minRating?: number;
@@ -34,13 +35,14 @@ export default function RecommendationsPage() {
       if (!user?.uid || !currentFamily) return;
       
       try {
-        const [membersData, cuisinesData, restrictionsData, restaurantsData, favoritesData, commentsData] = await Promise.all([
+        const [membersData, cuisinesData, restrictionsData, restaurantsData, favoritesData, commentsData, ratingsData] = await Promise.all([
           familyMembersService.getAll(currentFamily.id),
           referenceDataService.getCuisines(),
           referenceDataService.getDietaryRestrictions(),
           restaurantsService.getAll(),
           favoritesService.getUserFavorites(user.uid),
-          commentsService.getUserComments(user.uid)
+          commentsService.getUserComments(user.uid),
+          personalRatingsService.getUserRatings(user.uid)
         ]);
         setFamilyMembers(membersData);
         setCuisines(cuisinesData);
@@ -48,6 +50,7 @@ export default function RecommendationsPage() {
         setRestaurants(restaurantsData);
         setFavorites(favoritesData);
         setComments(commentsData);
+        setPersonalRatings(ratingsData);
       } catch (err) {
         setError('Failed to load initial data');
         console.error('Error loading initial data:', err);
@@ -103,6 +106,10 @@ export default function RecommendationsPage() {
 
   const getRestaurantComments = (restaurantId: string) => {
     return comments.filter(c => c.restaurantId === restaurantId);
+  };
+
+  const getPersonalRating = (restaurantId: string) => {
+    return personalRatings.find(r => r.restaurantId === restaurantId);
   };
 
   const handleGetRecommendations = async () => {
@@ -413,6 +420,7 @@ export default function RecommendationsPage() {
                   totalMembers={selectedMembers.length}
                   isFavorite={isRestaurantFavorite(recommendation.restaurant.id)}
                   userComments={getRestaurantComments(recommendation.restaurant.id)}
+                  personalRating={getPersonalRating(recommendation.restaurant.id)}
                   onFavoriteToggle={handleFavoriteToggle}
                 />
               </div>

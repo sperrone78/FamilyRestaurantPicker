@@ -49,3 +49,6 @@ app.use("/api/family-members", verifyAuth, familyMembersRouter);
 app.use("/api/restaurants", verifyAuth, restaurantsRouter);
 
 export const api = onRequest({maxInstances: 10}, app);
+
+// Export the setAdminClaims function
+export {setAdminClaims} from "./setAdminClaims";

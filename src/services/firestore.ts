@@ -16,12 +16,17 @@ import {
   CreateFamilyMemberRequest, 
   UpdateFamilyMemberRequest,
   Restaurant,
+  CreateRestaurantRequest,
+  UpdateRestaurantRequest,
   DietaryRestriction,
   Cuisine,
   RestaurantFavorite,
   RestaurantComment,
   CreateCommentRequest,
-  UpdateCommentRequest
+  UpdateCommentRequest,
+  PersonalRating,
+  CreatePersonalRatingRequest,
+  UpdatePersonalRatingRequest
 } from '../types';
 
 // Family Members
@@ -168,13 +173,26 @@ export const restaurantsService = {
     });
   },
 
-  async create(data: any): Promise<Restaurant> {
-    const docRef = await addDoc(collection(db, 'restaurants'), {
-      ...data,
+  async create(data: CreateRestaurantRequest): Promise<Restaurant> {
+    // Transform cuisines array to cuisineIds for storage
+    const transformedData = {
+      name: data.name,
+      address: data.address,
+      phone: data.phone,
+      cuisineIds: data.cuisines, // Store as array of IDs
+      priceRange: data.priceRange,
+      rating: data.rating,
+      website: data.website,
+      notes: data.notes,
+      dietaryAccommodations: data.dietaryAccommodations?.map(acc => ({
+        dietaryRestrictionId: acc.dietaryRestrictionId,
+        notes: acc.notes
+      })),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    });
+    };
 
+    const docRef = await addDoc(collection(db, 'restaurants'), transformedData);
     const doc = await getDoc(docRef);
     return {
       id: doc.id,
@@ -182,19 +200,29 @@ export const restaurantsService = {
     } as Restaurant;
   },
 
-  async update(id: string, data: any): Promise<Restaurant> {
+  async update(id: string, data: UpdateRestaurantRequest): Promise<Restaurant> {
     const docRef = doc(db, 'restaurants', id);
     
-    // Filter out undefined values to prevent Firestore errors
-    const updateData = Object.entries(data).reduce((acc, [key, value]) => {
-      if (value !== undefined) {
-        acc[key] = value;
-      }
-      return acc;
-    }, {} as any);
+    // Transform the data similar to create
+    const transformedData: any = {};
+    
+    if (data.name !== undefined) transformedData.name = data.name;
+    if (data.address !== undefined) transformedData.address = data.address;
+    if (data.phone !== undefined) transformedData.phone = data.phone;
+    if (data.cuisines !== undefined) transformedData.cuisineIds = data.cuisines;
+    if (data.priceRange !== undefined) transformedData.priceRange = data.priceRange;
+    if (data.rating !== undefined) transformedData.rating = data.rating;
+    if (data.website !== undefined) transformedData.website = data.website;
+    if (data.notes !== undefined) transformedData.notes = data.notes;
+    if (data.dietaryAccommodations !== undefined) {
+      transformedData.dietaryAccommodations = data.dietaryAccommodations?.map(acc => ({
+        dietaryRestrictionId: acc.dietaryRestrictionId,
+        notes: acc.notes
+      }));
+    }
     
     await updateDoc(docRef, {
-      ...updateData,
+      ...transformedData,
       updatedAt: new Date().toISOString()
     });
 
@@ -335,6 +363,86 @@ export const commentsService = {
 
   async deleteComment(commentId: string): Promise<void> {
     await deleteDoc(doc(db, 'restaurantComments', commentId));
+  }
+};
+
+// Personal Ratings
+export const personalRatingsService = {
+  async getUserRatings(userId: string): Promise<PersonalRating[]> {
+    const q = query(
+      collection(db, 'personalRatings'),
+      where('userId', '==', userId),
+      orderBy('updatedAt', 'desc')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as PersonalRating));
+  },
+
+  async getRestaurantRating(userId: string, restaurantId: string): Promise<PersonalRating | null> {
+    const q = query(
+      collection(db, 'personalRatings'),
+      where('userId', '==', userId),
+      where('restaurantId', '==', restaurantId)
+    );
+    
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+      return null;
+    }
+    
+    const doc = snapshot.docs[0];
+    return {
+      id: doc.id,
+      ...doc.data()
+    } as PersonalRating;
+  },
+
+  async setRating(userId: string, data: CreatePersonalRatingRequest): Promise<PersonalRating> {
+    // Check if rating already exists
+    const existing = await this.getRestaurantRating(userId, data.restaurantId);
+    
+    if (existing) {
+      // Update existing rating
+      return this.updateRating(existing.id, { rating: data.rating });
+    } else {
+      // Create new rating
+      const docRef = await addDoc(collection(db, 'personalRatings'), {
+        userId,
+        restaurantId: data.restaurantId,
+        rating: data.rating,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      const doc = await getDoc(docRef);
+      return {
+        id: doc.id,
+        ...doc.data()
+      } as PersonalRating;
+    }
+  },
+
+  async updateRating(ratingId: string, data: UpdatePersonalRatingRequest): Promise<PersonalRating> {
+    const docRef = doc(db, 'personalRatings', ratingId);
+    
+    await updateDoc(docRef, {
+      rating: data.rating,
+      updatedAt: new Date().toISOString()
+    });
+
+    const updatedDoc = await getDoc(docRef);
+    return {
+      id: updatedDoc.id,
+      ...updatedDoc.data()
+    } as PersonalRating;
+  },
+
+  async removeRating(ratingId: string): Promise<void> {
+    await deleteDoc(doc(db, 'personalRatings', ratingId));
   }
 };
 

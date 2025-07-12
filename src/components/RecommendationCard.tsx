@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { RestaurantRecommendation, RestaurantComment } from '../types';
+import { RestaurantRecommendation, RestaurantComment, PersonalRating } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { favoritesService } from '../services/firestore';
+import { StarRating } from './StarRating';
 
 interface RecommendationCardProps {
   recommendation: RestaurantRecommendation;
   totalMembers: number;
   isFavorite?: boolean;
   userComments?: RestaurantComment[];
+  personalRating?: PersonalRating;
   onFavoriteToggle?: (restaurantId: string, isFavorite: boolean) => void;
 }
 
@@ -16,6 +18,7 @@ export default function RecommendationCard({
   totalMembers, 
   isFavorite = false, 
   userComments = [], 
+  personalRating,
   onFavoriteToggle 
 }: RecommendationCardProps) {
   const { restaurant, percentage, reasons, accommodatedMembers, missedRestrictions } = recommendation;
@@ -50,37 +53,9 @@ export default function RecommendationCard({
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      if (i <= rating) {
-        stars.push(
-          <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-          </svg>
-        );
-      } else if (i - 0.5 <= rating) {
-        stars.push(
-          <svg key={i} className="w-4 h-4 text-yellow-400" viewBox="0 0 20 20">
-            <defs>
-              <linearGradient id={`half-${i}`}>
-                <stop offset="50%" stopColor="currentColor" />
-                <stop offset="50%" stopColor="transparent" />
-              </linearGradient>
-            </defs>
-            <path fill={`url(#half-${i})`} d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-          </svg>
-        );
-      } else {
-        stars.push(
-          <svg key={i} className="w-4 h-4 text-gray-300" viewBox="0 0 20 20">
-            <path fill="currentColor" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-          </svg>
-        );
-      }
-    }
-    return stars;
-  };
+  // Determine which rating to display
+  const displayRating = personalRating?.rating ?? restaurant.rating ?? 0;
+  const isPersonalRating = !!personalRating;
 
   return (
     <div className={`bg-white rounded-lg shadow-md p-6 relative ${
@@ -169,10 +144,15 @@ export default function RecommendationCard({
                 {'$'.repeat(restaurant.priceRange)}
               </span>
             )}
-            {restaurant.rating && (
+            {displayRating > 0 && (
               <div className="flex items-center space-x-1">
-                <div className="flex">{renderStars(restaurant.rating)}</div>
-                <span className="text-sm text-gray-600">({restaurant.rating})</span>
+                <StarRating
+                  rating={displayRating}
+                  isPersonal={isPersonalRating}
+                  isEditable={false}
+                  size="sm"
+                />
+                <span className="text-sm text-gray-600">({displayRating})</span>
               </div>
             )}
           </div>

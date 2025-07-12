@@ -1,17 +1,31 @@
 import { useState } from 'react';
 import { RestaurantWithUserData } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../hooks/useAdmin';
 import RestaurantDetailsModal from './RestaurantDetailsModal';
+import { StarRating } from './StarRating';
 
 interface RestaurantCardProps {
   restaurant: RestaurantWithUserData;
   onFavoriteToggle?: (restaurantId: string, isFavorite: boolean) => Promise<void>;
+  onEdit?: (restaurant: RestaurantWithUserData) => void;
+  onDelete?: (restaurantId: string) => void;
+  onPersonalRatingChange?: (restaurantId: string, rating: number) => void;
+  onPersonalRatingRemove?: (restaurantId: string) => void;
 }
 
-export default function RestaurantCard({ restaurant, onFavoriteToggle }: RestaurantCardProps) {
+export default function RestaurantCard({ 
+  restaurant, 
+  onFavoriteToggle, 
+  onEdit, 
+  onDelete, 
+  onPersonalRatingChange, 
+  onPersonalRatingRemove 
+}: RestaurantCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const { user, currentFamily } = useAuth();
+  const { isAdmin } = useAdmin();
   
   const isFavorite = restaurant.isFavorite || false;
   const formatPriceRange = (priceRange?: number) => {
@@ -19,10 +33,21 @@ export default function RestaurantCard({ restaurant, onFavoriteToggle }: Restaur
     return '$'.repeat(priceRange);
   };
 
-  const formatRating = (rating?: number) => {
-    if (!rating) return 'N/A';
-    return '★'.repeat(Math.floor(rating)) + (rating % 1 >= 0.5 ? '☆' : '');
+  const handlePersonalRatingChange = (rating: number) => {
+    if (onPersonalRatingChange) {
+      onPersonalRatingChange(restaurant.id, rating);
+    }
   };
+
+  const handlePersonalRatingRemove = () => {
+    if (onPersonalRatingRemove) {
+      onPersonalRatingRemove(restaurant.id);
+    }
+  };
+
+  // Determine which rating to display
+  const displayRating = restaurant.personalRating?.rating ?? restaurant.rating ?? 0;
+  const isPersonalRating = !!restaurant.personalRating;
 
   const handleFavoriteToggle = async () => {
     if (!user || !currentFamily || !onFavoriteToggle) return;
@@ -84,11 +109,29 @@ export default function RestaurantCard({ restaurant, onFavoriteToggle }: Restaur
             )}
           </div>
           <div className="text-right ml-4">
-            {restaurant.rating && (
-              <div className="text-yellow-500 text-lg mb-1" title={`${restaurant.rating}/5 stars`}>
-                {formatRating(restaurant.rating)}
-              </div>
-            )}
+            <div className="mb-1 flex justify-end">
+              {user ? (
+                <div className="relative">
+                  <StarRating
+                    rating={displayRating}
+                    isPersonal={isPersonalRating}
+                    isEditable={true}
+                    onRatingChange={handlePersonalRatingChange}
+                    onRemoveRating={isPersonalRating ? handlePersonalRatingRemove : undefined}
+                    size="md"
+                  />
+                </div>
+              ) : displayRating > 0 ? (
+                <StarRating
+                  rating={displayRating}
+                  isPersonal={isPersonalRating}
+                  isEditable={false}
+                  size="md"
+                />
+              ) : (
+                <div className="text-gray-400 text-sm">No rating</div>
+              )}
+            </div>
             {restaurant.priceRange && (
               <div className="text-green-600 font-semibold">
                 {formatPriceRange(restaurant.priceRange)}
@@ -139,29 +182,57 @@ export default function RestaurantCard({ restaurant, onFavoriteToggle }: Restaur
           </div>
         )}
 
-        <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-          {restaurant.website ? (
-            <a
-              href={restaurant.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center"
+        <div className="pt-4 border-t border-gray-200">
+          <div className="flex justify-between items-center mb-2">
+            {restaurant.website ? (
+              <a
+                href={restaurant.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center"
+              >
+                Visit Website
+                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            ) : (
+              <div></div>
+            )}
+            
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
             >
-              Visit Website
-              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          ) : (
-            <div></div>
-          )}
+              View Details
+            </button>
+          </div>
           
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-          >
-            View Details
-          </button>
+          {/* Admin Controls */}
+          {isAdmin && (onEdit || onDelete) && (
+            <div className="flex justify-end space-x-2 mt-2">
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(restaurant)}
+                  className="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                >
+                  Edit
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Are you sure you want to delete "${restaurant.name}"?`)) {
+                      onDelete(restaurant.id);
+                    }
+                  }}
+                  className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

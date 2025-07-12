@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
-import { referenceDataService, favoritesService } from '../services/firestore';
+import { useQuery, useQueryClient, useMutation } from 'react-query';
+import { referenceDataService, favoritesService, restaurantsService, personalRatingsService } from '../services/firestore';
 import RestaurantCard from '../components/RestaurantCard';
+import RestaurantForm from '../components/RestaurantForm';
+import { AdminRoute } from '../components/AdminRoute';
+import { AdminInitializer } from '../components/AdminInitializer';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../hooks/useAdmin';
 import { useRestaurantsWithUserData } from '../hooks/useRestaurantsWithUserData';
+import { CreateRestaurantRequest, UpdateRestaurantRequest, RestaurantWithUserData } from '../types';
 
 export default function RestaurantsPage() {
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<{
     cuisine?: string;
@@ -15,17 +21,91 @@ export default function RestaurantsPage() {
     search?: string;
     showFavoritesOnly?: boolean;
   }>({});
+  const [showRestaurantForm, setShowRestaurantForm] = useState(false);
+  const [editingRestaurant, setEditingRestaurant] = useState<RestaurantWithUserData | null>(null);
 
   const { 
     restaurantsWithUserData, 
     loading: restaurantsLoading, 
     error: restaurantsError,
     updateFavoriteStatus,
+    updatePersonalRating,
     clearOptimisticUpdate
   } = useRestaurantsWithUserData();
 
   const { data: cuisines = [] } = useQuery('cuisines', referenceDataService.getCuisines);
   const { data: dietaryRestrictions = [] } = useQuery('dietaryRestrictions', referenceDataService.getDietaryRestrictions);
+
+  // Admin mutations
+  const createRestaurantMutation = useMutation(
+    (data: CreateRestaurantRequest) => restaurantsService.create(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('restaurants');
+        setShowRestaurantForm(false);
+      },
+      onError: (error) => {
+        console.error('Error creating restaurant:', error);
+        alert('Failed to create restaurant. Please try again.');
+      }
+    }
+  );
+
+  const updateRestaurantMutation = useMutation(
+    ({ id, data }: { id: string; data: UpdateRestaurantRequest }) => 
+      restaurantsService.update(id, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('restaurants');
+        setEditingRestaurant(null);
+      },
+      onError: (error) => {
+        console.error('Error updating restaurant:', error);
+        alert('Failed to update restaurant. Please try again.');
+      }
+    }
+  );
+
+  const deleteRestaurantMutation = useMutation(
+    (id: string) => restaurantsService.delete(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('restaurants');
+      },
+      onError: (error) => {
+        console.error('Error deleting restaurant:', error);
+        alert('Failed to delete restaurant. Please try again.');
+      }
+    }
+  );
+
+  // Personal rating mutations
+  const setPersonalRatingMutation = useMutation(
+    ({ restaurantId, rating }: { restaurantId: string; rating: number }) => 
+      personalRatingsService.setRating(user!.uid, { restaurantId, rating }),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['personalRatings', user?.uid]);
+      },
+      onError: (error) => {
+        console.error('Error setting personal rating:', error);
+        alert('Failed to save rating. Please try again.');
+      }
+    }
+  );
+
+  const removePersonalRatingMutation = useMutation(
+    (ratingId: string) => personalRatingsService.removeRating(ratingId),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['personalRatings', user?.uid]);
+      },
+      onError: (error) => {
+        console.error('Error removing personal rating:', error);
+        alert('Failed to remove rating. Please try again.');
+      }
+    }
+  );
 
   const filteredRestaurants = restaurantsWithUserData.filter(restaurant => {
     // Favorites filter
@@ -87,6 +167,56 @@ export default function RestaurantsPage() {
     setFilters({});
   };
 
+  // Admin handlers
+  const handleCreateRestaurant = (data: CreateRestaurantRequest) => {
+    createRestaurantMutation.mutate(data);
+  };
+
+  const handleEditRestaurant = (restaurant: RestaurantWithUserData) => {
+    setEditingRestaurant(restaurant);
+  };
+
+  const handleUpdateRestaurant = (data: UpdateRestaurantRequest) => {
+    if (editingRestaurant) {
+      updateRestaurantMutation.mutate({ id: editingRestaurant.id, data });
+    }
+  };
+
+  const handleDeleteRestaurant = (id: string) => {
+    deleteRestaurantMutation.mutate(id);
+  };
+
+  const handleFormCancel = () => {
+    setShowRestaurantForm(false);
+    setEditingRestaurant(null);
+  };
+
+  // Personal rating handlers
+  const handlePersonalRatingChange = (restaurantId: string, rating: number) => {
+    if (!user) return;
+    
+    // Optimistically update the UI
+    updatePersonalRating(restaurantId, rating);
+    
+    // Update the database
+    setPersonalRatingMutation.mutate({ restaurantId, rating });
+  };
+
+  const handlePersonalRatingRemove = (restaurantId: string) => {
+    if (!user) return;
+    
+    const restaurant = restaurantsWithUserData.find(r => r.id === restaurantId);
+    const personalRating = restaurant?.personalRating;
+    
+    if (personalRating) {
+      // Optimistically update the UI
+      updatePersonalRating(restaurantId, null);
+      
+      // Update the database
+      removePersonalRatingMutation.mutate(personalRating.id);
+    }
+  };
+
   const handleFavoriteToggle = async (restaurantId: string, isFavorite: boolean) => {
     if (!user) return;
     
@@ -127,11 +257,24 @@ export default function RestaurantsPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Restaurants</h1>
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-3xl font-bold text-gray-900">Restaurants</h1>
+          <AdminRoute>
+            <button
+              onClick={() => setShowRestaurantForm(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              Add Restaurant
+            </button>
+          </AdminRoute>
+        </div>
         <p className="text-gray-600">
           Discover restaurants with options for every taste and dietary need.
         </p>
       </div>
+
+      {/* Admin Initializer */}
+      <AdminInitializer />
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -349,9 +492,31 @@ export default function RestaurantsPage() {
               key={restaurant.id} 
               restaurant={restaurant}
               onFavoriteToggle={handleFavoriteToggle}
+              onEdit={isAdmin ? handleEditRestaurant : undefined}
+              onDelete={isAdmin ? handleDeleteRestaurant : undefined}
+              onPersonalRatingChange={handlePersonalRatingChange}
+              onPersonalRatingRemove={handlePersonalRatingRemove}
             />
           ))}
         </div>
+      )}
+
+      {/* Restaurant Form Modals */}
+      {showRestaurantForm && (
+        <RestaurantForm
+          onSubmit={handleCreateRestaurant}
+          onCancel={handleFormCancel}
+          isLoading={createRestaurantMutation.isLoading}
+        />
+      )}
+
+      {editingRestaurant && (
+        <RestaurantForm
+          restaurant={editingRestaurant}
+          onSubmit={handleUpdateRestaurant}
+          onCancel={handleFormCancel}
+          isLoading={updateRestaurantMutation.isLoading}
+        />
       )}
     </div>
   );

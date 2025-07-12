@@ -14,6 +14,14 @@ export interface FamilyUser {
   joinedAt: Date;
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  isAdmin: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CreateFamilyRequest {
   name: string;
 }
